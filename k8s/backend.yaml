@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cinema-backend
+  namespace: cinema
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cinema-backend
+  template:
+    metadata:
+      labels:
+        app: cinema-backend
+    spec:
+      initContainers:
+        - name: migrate
+          image: your-registry/cinema-backend:latest  # replace with your image
+          command: ["sh", "-c", "node src/db/migrate.js && node src/db/seed.js"]
+          envFrom:
+            - configMapRef:
+                name: cinema-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: JWT_SECRET
+      containers:
+        - name: backend
+          image: your-registry/cinema-backend:latest  # replace with your image
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: cinema-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: JWT_SECRET
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cinema-backend-service
+  namespace: cinema
+spec:
+  selector:
+    app: cinema-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
