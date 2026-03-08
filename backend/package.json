@@ -20,7 +20,9 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "pg": "^8.11.3",
+    "pg-hstore": "^2.3.4",
     "qrcode": "^1.5.3",
+    "sequelize": "^6.37.8",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

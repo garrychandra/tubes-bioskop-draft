@@ -18,9 +18,9 @@
 ## Architecture Overview
 
 ```
-┌─────────────────────┐     HTTP/REST     ┌──────────────────┐     SQL      ┌──────────────┐
+┌─────────────────────┐     HTTP/REST     ┌──────────────────┐   Sequelize  ┌──────────────┐
 │   React Frontend    │ ───────────────── │  Express Backend │ ──────────── │  PostgreSQL  │
-│   (Vite + MUI)      │   Axios + JWT     │  (Node.js)       │   pg Pool    │  (Port 5432) │
+│   (Vite + MUI)      │   Axios + JWT     │  (Node.js)       │    ORM/SQL   │  (Port 5432) │
 │   Port 5173 (dev)   │                   │  Port 5000       │              │              │
 │   Port 80 (prod)    │                   │                  │              │              │
 └─────────────────────┘                   └──────────────────┘              └──────────────┘
@@ -28,9 +28,9 @@
 
 **Frontend** → Single-page React app served by Vite (dev) or Nginx (prod). Uses Redux Toolkit for state, Axios for API calls, MUI for UI components.
 
-**Backend** → RESTful Express API. JWT authentication, bcrypt password hashing, QR code generation, helmet/CORS/rate-limiting security middleware.
+**Backend** → RESTful Express API. JWT authentication, bcrypt password hashing, QR code generation, helmet/CORS/rate-limiting security middleware. Database access via **Sequelize ORM v6** with PostgreSQL dialect.
 
-**Database** → PostgreSQL 16 with UUID primary keys, 9 tables, full foreign key integrity, and performance indexes.
+**Database** → PostgreSQL 16 with UUID primary keys, 12 tables, full foreign key integrity, and performance indexes.
 
 ---
 
@@ -40,132 +40,150 @@
 
 | Table | Description | Key Relationships |
 |-------|-------------|-------------------|
-| **users** | Registered users (role: `user` or `admin`) | → orders |
-| **cinemas** | Cinema locations | → halls |
-| **halls** | Screens/auditoriums inside cinemas | → seats, → schedules |
-| **seats** | Individual seats in a hall (regular/vip/couple) | → seat_locks, → order_items |
-| **movies** | Film catalog with metadata | → schedules |
-| **schedules** | Showtimes linking movies to halls with pricing | → seat_locks, → orders |
-| **seat_locks** | Temporary seat holds during checkout (TTL-based) | → seats, → schedules, → users |
-| **orders** | Completed/pending purchases with barcode | → order_items, → users, → schedules |
-| **order_items** | Individual seats within an order | → orders, → seats |
+| **users** | Registered users (role: `User` or `Admin`) | → transaksi, rating, kursi_locks |
+| **film** | Film catalog with metadata and average rating | → jadwal, rating |
+| **bioskop** | Cinema locations | → studio |
+| **studio** | Screens/auditoriums inside a bioskop | → kursi, jadwal |
+| **kursi** | Individual seats in a studio | → tiket, kursi_locks |
+| **jadwal** | Showtimes linking a film to a studio | → tiket, kursi_locks |
+| **kursi_locks** | Temporary seat holds during checkout (10-min TTL) | → kursi, jadwal, users |
+| **transaksi** | Completed purchases | → tiket, detail_fnb, users |
+| **tiket** | Individual seat tickets in a transaksi | → transaksi, jadwal, kursi |
+| **fnb** | Food & beverage menu items | → detail_fnb |
+| **detail_fnb** | F&B line items in a transaksi | → transaksi, fnb |
+| **rating** | User film ratings (1–10, one per user per film) | → users, film |
 
 ### Table Details
 
 #### `users`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK, auto-generated |
-| username | VARCHAR(80) | UNIQUE, NOT NULL |
+| id_user | UUID | PK, auto-generated (UUIDV4) |
+| nama | VARCHAR(80) | NOT NULL |
 | email | VARCHAR(120) | UNIQUE, NOT NULL |
-| password_hash | TEXT | NOT NULL (bcrypt) |
-| role | VARCHAR(20) | DEFAULT `'user'` — values: `user`, `admin` |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
-| updated_at | TIMESTAMPTZ | DEFAULT NOW() |
+| password | TEXT | NOT NULL (bcrypt) |
+| role | VARCHAR(20) | DEFAULT `'User'` — values: `User`, `Admin` |
 
-#### `cinemas`
+#### `film`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK |
-| name | VARCHAR(200) | NOT NULL |
-| location | TEXT | NOT NULL |
-| image_url | TEXT | Optional |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
-
-#### `halls`
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | UUID | PK |
-| cinema_id | UUID | FK → cinemas(id) ON DELETE CASCADE |
-| name | VARCHAR(100) | NOT NULL |
-| rows | INT | DEFAULT 8 |
-| cols | INT | DEFAULT 10 |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
-
-#### `seats`
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | UUID | PK |
-| hall_id | UUID | FK → halls(id) ON DELETE CASCADE |
-| row_label | CHAR(1) | NOT NULL (e.g., `A`, `B`, `C`) |
-| col_number | INT | NOT NULL |
-| seat_type | VARCHAR(20) | DEFAULT `'regular'` — values: `regular`, `vip`, `couple` |
-| | | UNIQUE(hall_id, row_label, col_number) |
-
-#### `movies`
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | UUID | PK |
-| title | VARCHAR(300) | NOT NULL |
-| description | TEXT | Optional |
+| id_film | UUID | PK |
+| judul | VARCHAR(300) | NOT NULL |
+| deskripsi | TEXT | Optional |
 | poster_url | TEXT | Optional |
-| backdrop_url | TEXT | Optional |
+| durasi | INTEGER | NOT NULL, DEFAULT 120 (minutes) |
 | genre | VARCHAR(100) | Optional |
-| duration_min | INT | DEFAULT 120 |
-| rating | DECIMAL(3,1) | DEFAULT 0 |
-| language | VARCHAR(50) | DEFAULT `'Indonesian'` |
-| release_date | DATE | Optional |
+| avg_rating | DECIMAL(3,1) | DEFAULT 0 (auto-recalculated on each rating change) |
 | status | VARCHAR(20) | DEFAULT `'now_showing'` — values: `now_showing`, `coming_soon`, `ended` |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| release_date | DATE | Optional |
 
-#### `schedules`
+#### `bioskop`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK |
-| movie_id | UUID | FK → movies(id) ON DELETE CASCADE |
-| hall_id | UUID | FK → halls(id) ON DELETE CASCADE |
-| start_time | TIMESTAMPTZ | NOT NULL |
-| end_time | TIMESTAMPTZ | NOT NULL (auto-calculated from movie duration) |
-| price_regular | DECIMAL(12,2) | DEFAULT 50000 |
-| price_vip | DECIMAL(12,2) | DEFAULT 100000 |
-| price_couple | DECIMAL(12,2) | DEFAULT 150000 |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| id_bioskop | UUID | PK |
+| nama_bioskop | VARCHAR(200) | NOT NULL |
+| lokasi | TEXT | NOT NULL |
+| image_url | TEXT | Optional |
 
-#### `seat_locks`
+#### `studio`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK |
-| seat_id | UUID | FK → seats(id) ON DELETE CASCADE |
-| schedule_id | UUID | FK → schedules(id) ON DELETE CASCADE |
-| user_id | UUID | FK → users(id) ON DELETE CASCADE |
+| id_studio | UUID | PK |
+| id_bioskop | UUID | FK → bioskop(id_bioskop) ON DELETE CASCADE |
+| nama_studio | VARCHAR(100) | NOT NULL |
+| kapasitas | INTEGER | NOT NULL |
+
+#### `kursi`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_kursi | UUID | PK |
+| id_studio | UUID | FK → studio(id_studio) ON DELETE CASCADE |
+| nomor_kursi | VARCHAR(10) | NOT NULL |
+| | | UNIQUE(id_studio, nomor_kursi) |
+
+#### `jadwal`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_jadwal | UUID | PK |
+| id_film | UUID | FK → film(id_film) ON DELETE CASCADE |
+| id_studio | UUID | FK → studio(id_studio) ON DELETE CASCADE |
+| jam_tayang | TIMESTAMPTZ | NOT NULL |
+| jam_selesai | TIMESTAMPTZ | NOT NULL (auto-calculated from film.durasi) |
+| harga_tiket | DECIMAL(12,2) | NOT NULL |
+
+#### `kursi_locks`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_lock | UUID | PK |
+| id_kursi | UUID | FK → kursi(id_kursi) ON DELETE CASCADE |
+| id_jadwal | UUID | FK → jadwal(id_jadwal) ON DELETE CASCADE |
+| id_user | UUID | FK → users(id_user) ON DELETE CASCADE |
 | locked_at | TIMESTAMPTZ | DEFAULT NOW() |
-| expires_at | TIMESTAMPTZ | NOT NULL (default: 10 minutes from lock) |
-| | | UNIQUE(seat_id, schedule_id) |
+| expires_at | TIMESTAMPTZ | NOT NULL (locked_at + SEAT_LOCK_TTL seconds) |
+| | | UNIQUE(id_kursi, id_jadwal) |
 
-#### `orders`
+#### `transaksi`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK |
-| user_id | UUID | FK → users(id) |
-| schedule_id | UUID | FK → schedules(id) |
-| total_price | DECIMAL(12,2) | NOT NULL |
-| status | VARCHAR(30) | DEFAULT `'pending'` — values: `pending`, `paid`, `cancelled`, `used` |
-| barcode_data | TEXT | UNIQUE, NOT NULL |
-| payment_method | VARCHAR(50) | Optional |
-| paid_at | TIMESTAMPTZ | Optional |
-| created_at | TIMESTAMPTZ | DEFAULT NOW() |
+| id_transaksi | UUID | PK |
+| id_user | UUID | FK → users(id_user) |
+| total_harga | DECIMAL(12,2) | NOT NULL |
+| barcode | TEXT | UNIQUE, NOT NULL |
+| status_bayar | VARCHAR(30) | DEFAULT `'paid'` |
+| tanggal_bayar | TIMESTAMPTZ | DEFAULT NOW() |
 
-#### `order_items`
+#### `tiket`
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | UUID | PK |
-| order_id | UUID | FK → orders(id) ON DELETE CASCADE |
-| seat_id | UUID | FK → seats(id) |
-| price | DECIMAL(12,2) | NOT NULL |
-| | | UNIQUE(order_id, seat_id) |
+| id_tiket | UUID | PK |
+| id_transaksi | UUID | FK → transaksi(id_transaksi) ON DELETE CASCADE |
+| id_jadwal | UUID | FK → jadwal(id_jadwal) |
+| id_kursi | UUID | FK → kursi(id_kursi) |
+| barcode | TEXT | UNIQUE |
+| status_tiket | VARCHAR(20) | DEFAULT `'active'` — values: `active`, `used` |
+| | | UNIQUE(id_kursi, id_jadwal) |
+
+#### `fnb`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_item | UUID | PK |
+| nama_item | VARCHAR(200) | NOT NULL |
+| harga | DECIMAL(12,2) | NOT NULL |
+| kategori | VARCHAR(100) | Optional |
+| image_url | TEXT | Optional |
+
+#### `detail_fnb`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_detail | UUID | PK |
+| id_transaksi | UUID | FK → transaksi(id_transaksi) ON DELETE CASCADE |
+| id_item | UUID | FK → fnb(id_item) |
+| jumlah | INTEGER | NOT NULL |
+| harga_satuan | DECIMAL(12,2) | NOT NULL |
+
+#### `rating`
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id_rating | UUID | PK |
+| id_user | UUID | FK → users(id_user) ON DELETE CASCADE |
+| id_film | UUID | FK → film(id_film) ON DELETE CASCADE |
+| nilai | INTEGER | NOT NULL, validate min: 1, max: 10 |
+| ulasan | TEXT | Optional |
+| | | UNIQUE(id_user, id_film) |
 
 ### Indexes
 
 | Index | On |
 |-------|----|
-| idx_schedules_movie | schedules(movie_id) |
-| idx_schedules_hall | schedules(hall_id) |
-| idx_schedules_start | schedules(start_time) |
-| idx_seat_locks_schedule | seat_locks(schedule_id) |
-| idx_seat_locks_expires | seat_locks(expires_at) |
-| idx_orders_user | orders(user_id) |
-| idx_order_items_order | order_items(order_id) |
-| idx_order_items_seat | order_items(seat_id) |
+| idx_jadwal_film | jadwal(id_film) |
+| idx_jadwal_studio | jadwal(id_studio) |
+| idx_jadwal_jam | jadwal(jam_tayang) |
+| idx_kursi_studio | kursi(id_studio) |
+| idx_kursi_locks_jadwal | kursi_locks(id_jadwal) |
+| idx_kursi_locks_expires | kursi_locks(expires_at) |
+| idx_transaksi_user | transaksi(id_user) |
+| idx_tiket_transaksi | tiket(id_transaksi) |
+| idx_detail_fnb_transaksi | detail_fnb(id_transaksi) |
 
 ---
 
@@ -177,8 +195,9 @@
 |------|---------|
 | `backend/src/index.js` | Loads `.env`, imports the Express app, starts listening on `PORT` (default 5000) |
 | `backend/src/app.js` | Creates Express app with middleware: **helmet** (security headers), **CORS** (configurable origin), **rate limiter** (200 req/15min), **JSON parser**, **morgan** (HTTP logging). Mounts `/api` routes. Health check at `GET /health`. |
-| `backend/src/db/pool.js` | PostgreSQL connection pool (max 20 connections). Configured via env vars: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. |
-| `backend/src/middleware/auth.js` | **`authenticate`** — Verifies JWT Bearer token, loads user from DB, attaches to `req.user`. **`requireAdmin`** — Checks `req.user.role === 'admin'`. |
+| `backend/src/db/sequelize.js` | Sequelize ORM instance (postgres dialect, max 20 connections). Configured via env vars: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. |
+| `backend/src/models/index.js` | Barrel file — imports all 12 Sequelize models, defines all FK associations, exports `{ sequelize, User, Film, Bioskop, Studio, Jadwal, Kursi, KursiLock, Transaksi, Tiket, Fnb, DetailFnb, Rating }`. |
+| `backend/src/middleware/auth.js` | **`authenticate`** — Verifies JWT Bearer token, loads user via `User.findByPk`, attaches to `req.user`. **`requireAdmin`** — Checks `req.user.role === 'Admin'`. |
 
 ### Route Map
 
@@ -187,56 +206,77 @@ All routes are prefixed with `/api`.
 | Method | Endpoint | Auth | Controller | Description |
 |--------|----------|------|------------|-------------|
 | **Auth** (`/api/auth`) |
-| POST | `/auth/register` | — | `auth.register` | Create account (username, email, password) → returns user + JWT |
+| POST | `/auth/register` | — | `auth.register` | Create account (nama, email, password) → returns user + JWT |
 | POST | `/auth/login` | — | `auth.login` | Login (email, password) → returns user + JWT |
 | GET | `/auth/me` | ✅ | `auth.getMe` | Get current user from token |
-| **Movies** (`/api/movies`) |
-| GET | `/movies` | — | `movies.getAll` | List movies (optional filters: `status`, `genre`, `search`) |
-| GET | `/movies/:id` | — | `movies.getById` | Single movie details |
-| POST | `/movies` | ✅ Admin | `movies.create` | Create a movie |
-| PUT | `/movies/:id` | ✅ Admin | `movies.update` | Update a movie (partial with COALESCE) |
-| DELETE | `/movies/:id` | ✅ Admin | `movies.remove` | Delete a movie |
-| **Cinemas** (`/api/cinemas`) |
-| GET | `/cinemas` | — | `cinemas.getAll` | List all cinemas |
-| GET | `/cinemas/:id` | — | `cinemas.getById` | Single cinema |
-| GET | `/cinemas/:id/halls` | — | `cinemas.getHalls` | List halls in a cinema |
-| POST | `/cinemas` | ✅ Admin | `cinemas.create` | Create cinema |
-| PUT | `/cinemas/:id` | ✅ Admin | `cinemas.update` | Update cinema |
-| DELETE | `/cinemas/:id` | ✅ Admin | `cinemas.remove` | Delete cinema |
-| **Schedules** (`/api/schedules`) |
-| GET | `/schedules` | — | `schedules.getAll` | List schedules (optional: `movie_id`, `date` filter) |
-| GET | `/schedules/:id` | — | `schedules.getById` | Schedule details with movie/hall/cinema info |
-| GET | `/schedules/:id/seats` | — | `schedules.getSeatsForSchedule` | All seats with real-time status (available/locked/booked) |
-| POST | `/schedules` | ✅ Admin | `schedules.create` | Create schedule (auto-calculates `end_time` from movie duration) |
-| PUT | `/schedules/:id` | ✅ Admin | `schedules.update` | Update schedule (recalculates `end_time` if `start_time` changes) |
-| DELETE | `/schedules/:id` | ✅ Admin | `schedules.remove` | Delete schedule |
-| **Seats** (`/api/seats`) |
-| POST | `/seats/lock` | ✅ | `seats.lockSeats` | Lock seats for checkout (body: `schedule_id`, `seat_ids[]`) |
-| POST | `/seats/unlock` | ✅ | `seats.unlockSeats` | Release locked seats (body: `schedule_id`, `seat_ids[]`) |
-| **Tickets** (`/api/tickets`) |
-| POST | `/tickets/buy` | ✅ | `tickets.buy` | Purchase tickets (body: `schedule_id`, `seat_ids[]`, `payment_method`) |
-| GET | `/tickets/my` | ✅ | `tickets.getMyTickets` | User's order history with full details |
-| GET | `/tickets/verify/:barcode` | — | `tickets.verify` | Verify ticket by barcode string |
-| POST | `/tickets/use/:barcode` | ✅ Admin | `tickets.markUsed` | Mark ticket as used |
-| GET | `/tickets/:id/barcode` | ✅ | `tickets.getBarcode` | Get QR code data URL for an order |
+| **Films** (`/api/film`) |
+| GET | `/film` | — | `film.getAll` | List films (optional filters: `status`, `genre`, `search`) |
+| GET | `/film/:id` | — | `film.getById` | Single film details |
+| POST | `/film` | ✅ Admin | `film.create` | Create a film |
+| PUT | `/film/:id` | ✅ Admin | `film.update` | Update a film (partial — skips undefined fields) |
+| DELETE | `/film/:id` | ✅ Admin | `film.remove` | Delete a film |
+| **Cinemas** (`/api/bioskop`) |
+| GET | `/bioskop` | — | `bioskop.getAll` | List all cinemas |
+| GET | `/bioskop/:id` | — | `bioskop.getById` | Single cinema with its studios |
+| POST | `/bioskop` | ✅ Admin | `bioskop.create` | Create cinema |
+| PUT | `/bioskop/:id` | ✅ Admin | `bioskop.update` | Update cinema |
+| DELETE | `/bioskop/:id` | ✅ Admin | `bioskop.remove` | Delete cinema |
+| GET | `/bioskop/:id/studios` | — | `bioskop.getStudios` | List studios in a cinema |
+| POST | `/bioskop/:id/studios` | ✅ Admin | `bioskop.createStudio` | Add a studio to a cinema |
+| PUT | `/bioskop/:id/studios/:studioId` | ✅ Admin | `bioskop.updateStudio` | Update a studio |
+| DELETE | `/bioskop/:id/studios/:studioId` | ✅ Admin | `bioskop.removeStudio` | Delete a studio |
+| **Schedules** (`/api/jadwal`) |
+| GET | `/jadwal` | — | `jadwal.getAll` | List jadwal (optional: `id_film`, `date` filter) |
+| GET | `/jadwal/:id` | — | `jadwal.getById` | Jadwal details with film/studio/bioskop info |
+| GET | `/jadwal/:id/seats` | — | `jadwal.getSeatsForSchedule` | All kursi with real-time status (available/locked/booked) |
+| POST | `/jadwal` | ✅ Admin | `jadwal.create` | Create jadwal (auto-calculates `jam_selesai` from film.durasi) |
+| PUT | `/jadwal/:id` | ✅ Admin | `jadwal.update` | Update jadwal (recalculates `jam_selesai` if `jam_tayang` changes) |
+| DELETE | `/jadwal/:id` | ✅ Admin | `jadwal.remove` | Delete jadwal |
+| **Kursi** (`/api/kursi`) |
+| GET | `/kursi/studio/:studioId` | — | `kursi.getByStudio` | List all kursi in a studio |
+| POST | `/kursi` | ✅ Admin | `kursi.create` | Add a kursi to a studio |
+| DELETE | `/kursi/:id` | ✅ Admin | `kursi.remove` | Delete a kursi |
+| **Seat Locks** (`/api/seats`) |
+| POST | `/seats/lock` | ✅ | `kursi_locks.lockSeats` | Lock kursi for checkout (body: `id_jadwal`, `kursi_ids[]`) |
+| POST | `/seats/unlock` | ✅ | `kursi_locks.unlockSeats` | Release locked kursi |
+| **Tickets** (`/api/tiket`) |
+| POST | `/tiket/buy` | ✅ | `tiket.buy` | Purchase tickets + optional F&B (body: `id_jadwal`, `kursi_ids[]`, `fnb_items[]`) |
+| GET | `/tiket/my` | ✅ | `tiket.getMyTransactions` | User's transaksi history with full details |
+| GET | `/tiket/verify/:barcode` | — | `tiket.verify` | Verify ticket by barcode string |
+| POST | `/tiket/use/:barcode` | ✅ Admin | `tiket.markUsed` | Mark tiket as used |
+| GET | `/tiket/:id/barcode` | ✅ | `tiket.getBarcode` | Get QR code data URL for a transaksi |
+| **Ratings** (`/api/rating`) |
+| GET | `/rating/film/:filmId` | — | `rating.getByFilm` | All ratings for a film (with user info) |
+| POST | `/rating` | ✅ | `rating.create` | Submit a rating (nilai 1–10, optional ulasan) |
+| PUT | `/rating/:id` | ✅ | `rating.update` | Update your rating |
+| DELETE | `/rating/:id` | ✅ | `rating.remove` | Delete your rating |
+| **F&B** (`/api/fnb`) |
+| GET | `/fnb` | — | `fnb.getAll` | List all F&B items |
+| GET | `/fnb/:id` | — | `fnb.getById` | Single F&B item |
+| POST | `/fnb` | ✅ Admin | `fnb.create` | Create F&B item |
+| PUT | `/fnb/:id` | ✅ Admin | `fnb.update` | Update F&B item |
+| DELETE | `/fnb/:id` | ✅ Admin | `fnb.remove` | Delete F&B item |
 | **Admin** (`/api/admin`) |
-| GET | `/admin/stats` | ✅ Admin | `admin.getStats` | Dashboard statistics (users, orders, revenue) |
+| GET | `/admin/stats` | ✅ Admin | `admin.getStats` | Dashboard statistics (users, films, revenue, tiket) |
 | GET | `/admin/income` | ✅ Admin | `admin.getIncome` | Revenue trend (query: `period`, `days`) |
-| GET | `/admin/orders` | ✅ Admin | `admin.getOrders` | Paginated order list (query: `page`, `limit`, `status`) |
+| GET | `/admin/transactions` | ✅ Admin | `admin.getTransactions` | Paginated transaksi list (query: `page`, `limit`) |
 | GET | `/admin/users` | ✅ Admin | `admin.getUsers` | User list with spend totals |
 | PUT | `/admin/users/:id/role` | ✅ Admin | `admin.updateUserRole` | Change user role (body: `role`) |
 
 ### Controller → Database Connections
 
-| Controller | Tables Queried |
-|------------|----------------|
-| `auth.controller` | users |
-| `movies.controller` | movies |
-| `cinemas.controller` | cinemas, halls |
-| `schedules.controller` | schedules, movies, halls, cinemas, seats, seat_locks, orders, order_items |
-| `seats.controller` | seat_locks, orders, order_items |
-| `tickets.controller` | seat_locks, schedules, seats, orders, order_items, movies, halls, cinemas, users |
-| `admin.controller` | users, orders, movies, schedules, halls, cinemas |
+| Controller | Models / Tables Used |
+|------------|----------------------|
+| `auth.controller` | User |
+| `film.controller` | Film |
+| `bioskop.controller` | Bioskop, Studio |
+| `jadwal.controller` | Jadwal, Film, Studio, Bioskop, Kursi, KursiLock, Transaksi |
+| `kursi.controller` | Kursi, Studio |
+| `kursi_locks.controller` | KursiLock, Transaksi, Tiket |
+| `tiket.controller` | Transaksi, Tiket, DetailFnb, Jadwal, Film, Studio, Bioskop, Kursi, Fnb, KursiLock, User |
+| `rating.controller` | Rating, User, Film |
+| `fnb.controller` | Fnb |
+| `admin.controller` | User, Transaksi, Film, Tiket, Jadwal |
 
 ---
 
@@ -456,7 +496,7 @@ Staff/User opens VerifyPage
    c. If conflict → 409 error
    d. If clear → INSERT locks with TTL (default 10 min)
 4. Frontend shows review step with countdown
-5. On purchase → locks are deleted, order_items created
+5. On purchase → locks are deleted, tiket records created
 6. On cancel/back → unlockSeats() releases the locks
 7. On timeout → locks automatically expire (cleaned on next request)
 ```
@@ -480,10 +520,11 @@ The `seed.js` script creates demo data for development:
 
 | Entity | Details |
 |--------|---------|
-| Admin user | admin@cinemax.com / admin123 |
-| Regular user | user@cinemax.com / user123 |
-| 2 Cinemas | CineMax Grand Jakarta, CineMax Plaza Bandung |
-| 2 Halls | Studio 1 (8×10 = 80 seats), Studio 2 |
-| 80 Seats | Rows A-H, Cols 1-10 (row H = VIP) |
-| 5 Movies | Pre-populated with posters, genres, ratings |
-| 3 Schedules | Showtimes for today and tomorrow |
+| Admin | admin@cinema.com / admin123 |
+| User | john@example.com / user123 |
+| 2 Bioskop | CineMax Grand (Jakarta Pusat), StarPlex Cinema (Jakarta Utara) |
+| 4 Studios | Studio 1 (80 kursi), Studio 2 VIP (48 kursi), Theater A (80 kursi), Theater B IMAX (84 kursi) |
+| 292 Kursi | Auto-generated per studio configuration |
+| 5 Films | Avengers: Secret Wars, The Grand Illusion, Nusantara Rising, Eternal Echoes, Shadow Protocol |
+| 48 Jadwal | 3 days × 4 studios × 4 showtimes each |
+| F&B Items | Various food & beverage menu items |

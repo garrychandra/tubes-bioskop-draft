@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const pool = require('../db/pool');
+const { User } = require('../models');
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -9,9 +9,11 @@ const authenticate = async (req, res, next) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { rows } = await pool.query('SELECT id, username, email, role FROM users WHERE id=$1', [decoded.id]);
-    if (!rows.length) return res.status(401).json({ error: 'User not found' });
-    req.user = rows[0];
+    const user = await User.findByPk(decoded.id, {
+      attributes: ['id_user', 'nama', 'email', 'role'],
+    });
+    if (!user) return res.status(401).json({ error: 'User not found' });
+    req.user = user.toJSON();
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -19,8 +21,9 @@ const authenticate = async (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  if (req.user?.role !== 'Admin') return res.status(403).json({ error: 'Admin access required' });
   next();
 };
 
 module.exports = { authenticate, requireAdmin };
+

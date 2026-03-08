@@ -1,145 +1,139 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
-const pool = require('./pool');
+const { sequelize, User, Bioskop, Studio, Kursi, Film, Jadwal, Fnb, Rating } = require('../models');
 
 async function seed() {
-  const client = await pool.connect();
+  const t = await sequelize.transaction();
   try {
-    // Skip seed if data already exists
-    const existing = await client.query('SELECT COUNT(*) FROM cinemas');
-    if (parseInt(existing.rows[0].count) > 0) {
+    const existing = await Bioskop.count({ transaction: t });
+    if (existing > 0) {
+      await t.rollback();
       console.log('Database already seeded — skipping.');
       return;
     }
 
     console.log('Seeding database...');
-    await client.query('BEGIN');
 
-    // Admin user
+    // Users
     const adminHash = await bcrypt.hash('admin123', 12);
     const userHash = await bcrypt.hash('user123', 12);
+    const admin = await User.create({ nama: 'admin', email: 'admin@cinema.com', password: adminHash, role: 'Admin' }, { transaction: t });
+    const user = await User.create({ nama: 'johndoe', email: 'john@example.com', password: userHash, role: 'User' }, { transaction: t });
 
-    const adminId = uuidv4();
-    const userId = uuidv4();
+    // Bioskop
+    const bioskop1 = await Bioskop.create({
+      nama_bioskop: 'CineMax Grand',
+      lokasi: 'Mall Grand Indonesia, Jakarta Pusat',
+      image_url: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800',
+    }, { transaction: t });
+    const bioskop2 = await Bioskop.create({
+      nama_bioskop: 'StarPlex Cinema',
+      lokasi: 'Mall of Indonesia, Jakarta Utara',
+      image_url: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800',
+    }, { transaction: t });
 
-    await client.query(`
-      INSERT INTO users (id, username, email, password_hash, role) VALUES
-      ($1, 'admin', 'admin@cinema.com', $2, 'admin'),
-      ($3, 'johndoe', 'john@example.com', $4, 'user')
-      ON CONFLICT DO NOTHING
-    `, [adminId, adminHash, userId, userHash]);
+    // Studios
+    const studio1 = await Studio.create({ nama_studio: 'Studio 1', kapasitas: 80, id_bioskop: bioskop1.id_bioskop }, { transaction: t });
+    const studio2 = await Studio.create({ nama_studio: 'Studio 2 VIP', kapasitas: 48, id_bioskop: bioskop1.id_bioskop }, { transaction: t });
+    const studio3 = await Studio.create({ nama_studio: 'Theater A', kapasitas: 80, id_bioskop: bioskop2.id_bioskop }, { transaction: t });
+    const studio4 = await Studio.create({ nama_studio: 'Theater B IMAX', kapasitas: 84, id_bioskop: bioskop2.id_bioskop }, { transaction: t });
 
-    // Cinemas
-    const cinema1Id = uuidv4();
-    const cinema2Id = uuidv4();
-    await client.query(`
-      INSERT INTO cinemas (id, name, location, image_url) VALUES
-      ($1, 'CineMax Grand', 'Mall Grand Indonesia, Jakarta Pusat', 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800'),
-      ($2, 'StarPlex Cinema', 'Mall of Indonesia, Jakarta Utara', 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800')
-    `, [cinema1Id, cinema2Id]);
-
-    // Halls — Cinema 1
-    const hall1Id = uuidv4();
-    const hall2Id = uuidv4();
-    await client.query(`
-      INSERT INTO halls (id, cinema_id, name, rows, cols) VALUES
-      ($1, $3, 'Studio 1', 8, 10),
-      ($2, $3, 'Studio 2 VIP', 6, 8)
-    `, [hall1Id, hall2Id, cinema1Id]);
-
-    // Halls — Cinema 2
-    const hall3Id = uuidv4();
-    const hall4Id = uuidv4();
-    await client.query(`
-      INSERT INTO halls (id, cinema_id, name, rows, cols) VALUES
-      ($1, $3, 'Theater A', 8, 10),
-      ($2, $3, 'Theater B IMAX', 7, 12)
-    `, [hall3Id, hall4Id, cinema2Id]);
-
-    // Helper: generate seats for a hall
-    async function generateSeats(hallId, numRows, numCols) {
+    // Generate kursi for each studio
+    async function generateKursi(studioId, numRows, numCols) {
       const labels = 'ABCDEFGHIJKLMNOP'.slice(0, numRows).split('');
-      const vipRows = labels.slice(-2); // last 2 rows are VIP
+      const seats = [];
       for (const row of labels) {
         for (let col = 1; col <= numCols; col++) {
-          const type = vipRows.includes(row) ? 'vip' : 'regular';
-          await client.query(`
-            INSERT INTO seats (id, hall_id, row_label, col_number, seat_type)
-            VALUES ($1, $2, $3, $4, $5)
-          `, [uuidv4(), hallId, row, col, type]);
+          seats.push({ nomor_kursi: `${row}${col}`, id_studio: studioId });
         }
       }
+      await Kursi.bulkCreate(seats, { transaction: t });
     }
 
-    await generateSeats(hall1Id, 8, 10);
-    await generateSeats(hall2Id, 6, 8);
-    await generateSeats(hall3Id, 8, 10);
-    await generateSeats(hall4Id, 7, 12);
+    await generateKursi(studio1.id_studio, 8, 10);
+    await generateKursi(studio2.id_studio, 6, 8);
+    await generateKursi(studio3.id_studio, 8, 10);
+    await generateKursi(studio4.id_studio, 7, 12);
 
-    // Movies
-    const movies = [
-      { title: 'Avengers: Secret Wars', genre: 'Action, Sci-Fi', duration: 180, rating: 8.5, status: 'now_showing', poster: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=400' },
-      { title: 'The Grand Illusion', genre: 'Drama, Thriller', duration: 135, rating: 7.8, status: 'now_showing', poster: 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400' },
-      { title: 'Nusantara Rising', genre: 'Action, Adventure', duration: 150, rating: 8.1, status: 'now_showing', poster: 'https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=400' },
-      { title: 'Eternal Echoes', genre: 'Romance, Drama', duration: 120, rating: 7.2, status: 'coming_soon', poster: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400' },
-      { title: 'Shadow Protocol', genre: 'Spy, Action', duration: 145, rating: 8.0, status: 'now_showing', poster: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400' },
+    // Film
+    const filmData = [
+      { judul: 'Avengers: Secret Wars', genre: 'Action, Sci-Fi', durasi: 180, avg_rating: 8.5, status: 'now_showing', poster_url: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=400' },
+      { judul: 'The Grand Illusion', genre: 'Drama, Thriller', durasi: 135, avg_rating: 7.8, status: 'now_showing', poster_url: 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400' },
+      { judul: 'Nusantara Rising', genre: 'Action, Adventure', durasi: 150, avg_rating: 8.1, status: 'now_showing', poster_url: 'https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=400' },
+      { judul: 'Eternal Echoes', genre: 'Romance, Drama', durasi: 120, avg_rating: 7.2, status: 'coming_soon', poster_url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400' },
+      { judul: 'Shadow Protocol', genre: 'Spy, Action', durasi: 145, avg_rating: 8.0, status: 'now_showing', poster_url: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400' },
     ];
 
-    const movieIds = [];
-    for (const m of movies) {
-      const mid = uuidv4();
-      movieIds.push(mid);
-      await client.query(`
-        INSERT INTO movies (id, title, description, poster_url, genre, duration_min, rating, release_date, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
-      `, [mid, m.title, `An epic ${m.genre} film that will blow your mind.`, m.poster, m.genre, m.duration, m.rating, m.status]);
-    }
+    const films = await Film.bulkCreate(filmData.map(f => ({
+      judul: f.judul,
+      deskripsi: `Film ${f.genre} epik yang wajib ditonton.`,
+      poster_url: f.poster_url,
+      durasi: f.durasi,
+      genre: f.genre,
+      avg_rating: f.avg_rating,
+      status: f.status,
+      release_date: new Date(),
+    })), { transaction: t });
 
-    // Schedules — generate for today, tomorrow, and day after for both cinemas
+    // Jadwal
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    const hallsConfig = [
-      { hallId: hall1Id, label: 'CineMax Studio 1' },
-      { hallId: hall2Id, label: 'CineMax Studio 2 VIP' },
-      { hallId: hall3Id, label: 'StarPlex Theater A' },
-      { hallId: hall4Id, label: 'StarPlex Theater B IMAX' },
-    ];
-
-    const showtimeHours = [10, 13, 16, 19]; // 10am, 1pm, 4pm, 7pm
+    const studios = [studio1, studio2, studio3, studio4];
+    const showtimeHours = [10, 13, 16, 19];
+    const jadwalBulk = [];
 
     for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
       const day = new Date(today.getTime() + dayOffset * 86400000);
-      for (const hall of hallsConfig) {
-        // Pick 2-3 movies per hall per day
-        const hallMovies = movieIds.filter((_, i) => movies[i].status === 'now_showing');
-        for (let s = 0; s < Math.min(showtimeHours.length, hallMovies.length); s++) {
-          const mid = hallMovies[s % hallMovies.length];
-          const movieDuration = movies[movieIds.indexOf(mid)].duration;
+      for (const studio of studios) {
+        const showingFilms = films.slice(0, 4);
+        for (let s = 0; s < Math.min(showtimeHours.length, showingFilms.length); s++) {
+          const film = showingFilms[s % showingFilms.length];
           const start = new Date(day);
           start.setHours(showtimeHours[s], 0, 0, 0);
-          const end = new Date(start.getTime() + movieDuration * 60000);
-          await client.query(`
-            INSERT INTO schedules (id, movie_id, hall_id, start_time, end_time, price_regular, price_vip, price_couple)
-            VALUES ($1, $2, $3, $4, $5, 50000, 100000, 150000)
-          `, [uuidv4(), mid, hall.hallId, start, end]);
+          const end = new Date(start.getTime() + film.durasi * 60000);
+          jadwalBulk.push({
+            jam_tayang: start,
+            jam_selesai: end,
+            harga_tiket: 50000,
+            id_studio: studio.id_studio,
+            id_film: film.id_film,
+          });
         }
       }
     }
+    await Jadwal.bulkCreate(jadwalBulk, { transaction: t });
 
-    await client.query('COMMIT');
+    // FnB items
+    await Fnb.bulkCreate([
+      { nama_item: 'Popcorn Large', harga: 35000 },
+      { nama_item: 'Popcorn Medium', harga: 25000 },
+      { nama_item: 'Coca-Cola', harga: 15000 },
+      { nama_item: 'Sprite', harga: 15000 },
+      { nama_item: 'Nachos', harga: 30000 },
+      { nama_item: 'Hot Dog', harga: 28000 },
+      { nama_item: 'Mineral Water', harga: 10000 },
+    ], { transaction: t });
+
+    // Sample ratings from johndoe
+    const ratingData = [
+      { nilai_rating: 9, komentar: 'Film keren banget!', id_user: user.id_user, id_film: films[0].id_film },
+      { nilai_rating: 8, komentar: 'Ceritanya seru!', id_user: user.id_user, id_film: films[1].id_film },
+      { nilai_rating: 7, komentar: 'Lumayan bagus.', id_user: user.id_user, id_film: films[2].id_film },
+    ];
+    await Rating.bulkCreate(ratingData, { transaction: t });
+
+    await t.commit();
     console.log('Seeding completed successfully.');
     console.log('Admin: admin@cinema.com / admin123');
     console.log('User: john@example.com / user123');
   } catch (err) {
-    await client.query('ROLLBACK');
+    await t.rollback();
     console.error('Seeding failed:', err);
     process.exit(1);
   } finally {
-    client.release();
-    await pool.end();
+    await sequelize.close();
   }
 }
 
 seed();
+

@@ -415,9 +415,9 @@ The frontend origin doesn't match `FRONTEND_URL` in backend config:
 
 `JWT_SECRET` is not set. Create or update your `backend/.env` file.
 
-### Migrations fail with "relation already exists"
+### Migrations fail or schema is out of sync
 
-The tables already exist from a previous run. This is safe to ignore — migrations use `CREATE TABLE IF NOT EXISTS`. If you want a clean slate:
+`npm run migrate` uses Sequelize `sync({ force: true })` which **drops and recreates** all managed tables. Run it whenever you need a clean schema. If you want a full clean slate:
 
 ```bash
 # Docker Compose
@@ -431,9 +431,9 @@ npm run migrate
 npm run seed
 ```
 
-### Seed says "ON CONFLICT DO NOTHING" — no data inserted
+### Seed says "Database already seeded — skipping."
 
-The seed data already exists. If you want to re-seed, drop the database first (see above).
+Data already exists (detected by checking the `bioskop` count). To re-seed, run `npm run migrate` first to drop all tables, then `npm run seed` again.
 
 ### Port already in use
 
