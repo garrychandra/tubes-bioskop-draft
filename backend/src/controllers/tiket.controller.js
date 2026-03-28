@@ -62,6 +62,14 @@ const buy = async (req, res) => {
       { transaction: t }
     );
 
+    // Load seat numbers so checkout response can show user-facing seat labels
+    const kursiRows = await sequelize.query(`
+      SELECT id_kursi, nomor_kursi
+      FROM kursi
+      WHERE id_kursi = ANY($1::uuid[])
+    `, { bind: [kursi_ids], type: QueryTypes.SELECT, transaction: t });
+    const nomorByKursiId = new Map(kursiRows.map(k => [k.id_kursi, k.nomor_kursi]));
+
     // Create tiket for each kursi
     const tiketResults = [];
     for (const kursiId of kursi_ids) {
@@ -70,7 +78,12 @@ const buy = async (req, res) => {
         { barcode, status_tiket: 'active', id_transaksi: transaksi.id_transaksi, id_jadwal, id_kursi: kursiId },
         { transaction: t }
       );
-      tiketResults.push({ id_tiket: tiket.id_tiket, barcode, id_kursi: kursiId });
+      tiketResults.push({
+        id_tiket: tiket.id_tiket,
+        barcode,
+        id_kursi: kursiId,
+        nomor_kursi: nomorByKursiId.get(kursiId) || null,
+      });
     }
 
     // Create detail_fnb records
@@ -106,7 +119,7 @@ const getMyTransactions = async (req, res) => {
         JSON_AGG(DISTINCT JSONB_BUILD_OBJECT(
           'id_tiket', t.id_tiket, 'barcode', t.barcode, 'status_tiket', t.status_tiket,
           'nomor_kursi', k.nomor_kursi, 'id_kursi', k.id_kursi,
-          'judul', f.judul, 'jam_tayang', j.jam_tayang,
+          'judul', f.judul, 'poster_url', f.poster_url, 'jam_tayang', j.jam_tayang,
           'nama_studio', s.nama_studio, 'nama_bioskop', b.nama_bioskop
         )) FILTER (WHERE t.id_tiket IS NOT NULL) as tiket,
         JSON_AGG(DISTINCT JSONB_BUILD_OBJECT(

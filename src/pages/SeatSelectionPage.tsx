@@ -31,24 +31,22 @@ export default function SeatSelectionPage() {
   }, [dispatch, id])
 
   const getPriceForSeat = (seatId: string) => {
-    const seat = seats.find((s) => s.id === seatId)
+    const seat = seats.find((s) => s.id_kursi === seatId)
     if (!seat || !schedule) return 0
-    if (seat.seat_type === 'vip') return Number(schedule.price_vip)
-    if (seat.seat_type === 'couple') return Number(schedule.price_couple)
-    return Number(schedule.price_regular)
+    return Number(schedule.harga_tiket)
   }
 
   const totalPrice = selectedSeats.reduce((sum, sid) => sum + getPriceForSeat(sid), 0)
 
   const handleProceed = async () => {
     if (!id || selectedSeats.length === 0) return
-    const result = await dispatch(lockSeats({ schedule_id: id, seat_ids: selectedSeats }))
+    const result = await dispatch(lockSeats({ id_jadwal: id, kursi_ids: selectedSeats }))
     if (lockSeats.fulfilled.match(result)) setStep('review')
   }
 
   const handleBuy = async () => {
     if (!id) return
-    const result = await dispatch(buyTickets({ schedule_id: id, seat_ids: selectedSeats, payment_method: payMethod }))
+    const result = await dispatch(buyTickets({ id_jadwal: id, kursi_ids: selectedSeats }))
     if (buyTickets.fulfilled.match(result)) navigate('/checkout/success')
   }
 
@@ -58,16 +56,16 @@ export default function SeatSelectionPage() {
 
   if (!schedule) return null
 
-  const selectedSeatObjects = seats.filter((s) => selectedSeats.includes(s.id))
+  const selectedSeatObjects = seats.filter((s) => selectedSeats.includes(s.id_kursi))
 
   return (
     <Container maxWidth="lg" sx={{ py: 5 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>{schedule.movie_title}</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>{schedule.judul}</Typography>
         <Typography color="text.secondary">
-          {schedule.cinema_name} · {schedule.hall_name} ·{' '}
-          {new Date(schedule.start_time).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
+          {schedule.nama_bioskop} · {schedule.nama_studio} ·{' '}
+          {new Date(schedule.jam_tayang).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
         </Typography>
       </Box>
 
@@ -86,7 +84,7 @@ export default function SeatSelectionPage() {
               <SeatMap
                 seats={seats}
                 selectedSeats={selectedSeats}
-                currentUserId={user?.id}
+                currentUserId={user?.id_user}
                 onToggle={(seatId) => dispatch(toggleSeat(seatId))}
               />
             </Paper>
@@ -103,15 +101,15 @@ export default function SeatSelectionPage() {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 {selectedSeatObjects.map((seat) => (
-                  <Box key={seat.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box key={seat.id_kursi} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
                       <Typography variant="body1">
-                        Seat {seat.row_label}{seat.col_number}
+                        Seat {seat.nomor_kursi}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">{seat.seat_type}</Typography>
+                      <Typography variant="caption" color="text.secondary">Regular</Typography>
                     </Box>
                     <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                      Rp{getPriceForSeat(seat.id).toLocaleString()}
+                      Rp{getPriceForSeat(seat.id_kursi).toLocaleString()}
                     </Typography>
                   </Box>
                 ))}
@@ -154,13 +152,13 @@ export default function SeatSelectionPage() {
           <Paper sx={{ p: 3, position: 'sticky', top: 80 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Order Summary</Typography>
             <Box component="img"
-              src={schedule.poster_url} alt={schedule.movie_title}
+              src={schedule.poster_url || 'https://via.placeholder.com/300x450'} alt={schedule.judul || 'Movie Poster'}
               sx={{ width: '100%', borderRadius: 1, mb: 2 }}
             />
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{schedule.movie_title}</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{schedule.cinema_name}</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{schedule.judul}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{schedule.nama_bioskop}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {new Date(schedule.start_time).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+              {new Date(schedule.jam_tayang).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
             </Typography>
             <Divider sx={{ my: 2 }} />
             <Typography variant="body2" color="text.secondary">
@@ -181,7 +179,7 @@ export default function SeatSelectionPage() {
             )}
             {step === 'review' && (
               <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => {
-                if (id) dispatch(unlockSeats({ schedule_id: id, seat_ids: selectedSeats }))
+                if (id) dispatch(unlockSeats({ id_jadwal: id, kursi_ids: selectedSeats }))
                 setStep('select')
               }}>
                 Back to Selection

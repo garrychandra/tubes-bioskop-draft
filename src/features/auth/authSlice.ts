@@ -2,10 +2,10 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
 import api from '../../services/api'
 
 export interface User {
-  id: string
-  username: string
+  id_user: string
+  nama: string
   email: string
-  role: 'user' | 'admin'
+  role: 'User' | 'Admin'
   created_at: string
 }
 
@@ -20,7 +20,7 @@ const storedUser = localStorage.getItem('cinema_user')
 const storedToken = localStorage.getItem('cinema_token')
 
 const initialState: AuthState = {
-  user: storedUser ? JSON.parse(storedUser) : null,
+  user: storedUser ? (JSON.parse(storedUser) as User) : null,
   token: storedToken,
   loading: false,
   error: null,
@@ -40,9 +40,13 @@ export const login = createAsyncThunk(
 
 export const register = createAsyncThunk(
   'auth/register',
-  async (data: { username: string; email: string; password: string }, { rejectWithValue }) => {
+  async (data: { nama: string; email: string; password: string }, { rejectWithValue }) => {
     try {
-      const res = await api.post('/auth/register', data)
+      const res = await api.post('/auth/register', {
+        nama: data.nama,
+        email: data.email,
+        password: data.password,
+      })
       return res.data
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.error || 'Registration failed')

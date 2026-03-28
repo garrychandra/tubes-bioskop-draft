@@ -2,12 +2,10 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
 import api from '../../services/api'
 
 export interface Seat {
-  id: string
-  hall_id: string
-  row_label: string
-  col_number: number
-  seat_type: 'regular' | 'vip' | 'couple'
-  status: 'available' | 'locked' | 'booked'
+  id_kursi: string
+  id_studio: string
+  nomor_kursi: string
+  status: 'available' | 'locked' | 'occupied'
   locked_by?: string
   lock_expires_at?: string
 }
@@ -32,9 +30,9 @@ const initialState: SeatsState = {
 
 export const fetchSeatsForSchedule = createAsyncThunk(
   'seats/fetchForSchedule',
-  async (scheduleId: string, { rejectWithValue }) => {
+  async (idJadwal: string, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/schedules/${scheduleId}/seats`)
+      const res = await api.get(`/jadwal/${idJadwal}/seats`)
       return res.data.seats as Seat[]
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
@@ -42,9 +40,9 @@ export const fetchSeatsForSchedule = createAsyncThunk(
 
 export const lockSeats = createAsyncThunk(
   'seats/lock',
-  async ({ schedule_id, seat_ids }: { schedule_id: string; seat_ids: string[] }, { rejectWithValue }) => {
+  async ({ id_jadwal, kursi_ids }: { id_jadwal: string; kursi_ids: string[] }, { rejectWithValue }) => {
     try {
-      const res = await api.post('/seats/lock', { schedule_id, seat_ids })
+      const res = await api.post('/seats/lock', { id_jadwal, kursi_ids })
       return res.data as { locked: boolean; expires_at: string; ttl_seconds: number }
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed to lock seats') }
   },
@@ -52,8 +50,8 @@ export const lockSeats = createAsyncThunk(
 
 export const unlockSeats = createAsyncThunk(
   'seats/unlock',
-  async ({ schedule_id, seat_ids }: { schedule_id: string; seat_ids: string[] }, { rejectWithValue }) => {
-    try { await api.post('/seats/unlock', { schedule_id, seat_ids }) }
+  async ({ id_jadwal, kursi_ids }: { id_jadwal: string; kursi_ids: string[] }, { rejectWithValue }) => {
+    try { await api.post('/seats/unlock', { id_jadwal, kursi_ids }) }
     catch (err: any) { return rejectWithValue(err.response?.data?.error) }
   },
 )
@@ -91,7 +89,7 @@ const seatsSlice = createSlice({
         s.lockExpiry = a.payload.expires_at;
         // Mark locked seats as 'locked' in the local state
         for (const seat of s.seats) {
-          if (s.selectedSeats.includes(seat.id)) {
+          if (s.selectedSeats.includes(seat.id_kursi)) {
             seat.status = 'locked';
           }
         }

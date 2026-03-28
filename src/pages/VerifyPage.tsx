@@ -61,30 +61,28 @@ export default function VerifyPage() {
                 <Divider sx={{ mb: 2 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
                   <Box sx={{ p: 1.5, bgcolor: 'white', borderRadius: 1 }}>
-                    <QRCodeSVG value={verifyResult.ticket.barcode_data} size={150} />
+                    <QRCodeSVG value={verifyResult.ticket.barcode} size={150} />
                   </Box>
                 </Box>
                 {[
-                  ['Movie', verifyResult.ticket.movie_title],
-                  ['Cinema', verifyResult.ticket.cinema_name],
-                  ['Hall', verifyResult.ticket.hall_name],
-                  ['Showtime', new Date(verifyResult.ticket.start_time).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })],
-                  ['Customer', `${verifyResult.ticket.username} (${verifyResult.ticket.email})`],
-                  ['Status', verifyResult.ticket.status],
+                  ['Movie', verifyResult.ticket.judul],
+                  ['Cinema', verifyResult.ticket.nama_bioskop],
+                  ['Hall', verifyResult.ticket.nama_studio],
+                  ['Showtime', verifyResult.ticket.jam_tayang ? new Date(verifyResult.ticket.jam_tayang).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'],
+                  ['Customer', `${verifyResult.ticket.nama} (${verifyResult.ticket.email})`],
+                  ['Status', verifyResult.ticket.status_tiket],
                 ].map(([label, value]) => (
                   <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     <Typography variant="body2" sx={{ fontWeight: label === 'Status' ? 700 : 400 }}>
-                      {label === 'Status' ? <Chip label={String(value).toUpperCase()} size="small" color={value === 'paid' ? 'success' : 'default'} /> : value}
+                      {label === 'Status' ? <Chip label={String(value).toUpperCase()} size="small" color={value === 'active' ? 'success' : 'default'} /> : value}
                     </Typography>
                   </Box>
                 ))}
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>Seats:</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    {verifyResult.ticket.seats?.map((s: any) => (
-                      <Chip key={`${s.row_label}${s.col_number}`} label={`${s.row_label}${s.col_number}`} size="small" variant="outlined" />
-                    ))}
+                    <Chip label={verifyResult.ticket.nomor_kursi || '-'} size="small" variant="outlined" />
                   </Box>
                 </Box>
               </>

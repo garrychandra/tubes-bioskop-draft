@@ -26,7 +26,7 @@ export default function MoviesPage() {
   }, [dispatch, status])
 
   const filtered = items.filter((m) =>
-    m.title.toLowerCase().includes(search.toLowerCase()) ||
+    m.judul.toLowerCase().includes(search.toLowerCase()) ||
     m.genre?.toLowerCase().includes(search.toLowerCase()),
   )
 
@@ -68,7 +68,7 @@ export default function MoviesPage() {
       ) : (
         <Grid container spacing={3}>
           {filtered.map((movie) => (
-            <Grid item xs={6} sm={4} md={3} key={movie.id}>
+            <Grid item xs={6} sm={4} md={3} key={movie.id_film}>
               <MovieCard movie={movie} />
             </Grid>
           ))}

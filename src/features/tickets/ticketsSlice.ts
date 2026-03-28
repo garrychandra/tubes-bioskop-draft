@@ -1,38 +1,73 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import api from '../../services/api'
 
-export interface OrderItem {
-  seat_id: string
-  price: number
-  row_label: string
-  col_number: number
-  seat_type: string
+interface PurchasedTicket {
+  id_tiket: string
+  barcode: string
+  id_kursi: string
+  nomor_kursi?: string | null
+}
+
+interface PurchaseResult {
+  transaksi: {
+    id_transaksi: string
+    total_bayar: number | string
+  }
+  tiket: PurchasedTicket[]
+  qr_code: string
+}
+
+interface VerifyResult {
+  valid: boolean
+  ticket?: {
+    barcode: string
+    judul?: string
+    nama_bioskop?: string
+    nama_studio?: string
+    jam_tayang?: string
+    nama?: string
+    email?: string
+    status_tiket?: string
+    nomor_kursi?: string
+  }
 }
 
 export interface Ticket {
-  id: string
-  user_id: string
-  schedule_id: string
-  total_price: number
-  status: 'pending' | 'paid' | 'cancelled' | 'used'
-  barcode_data: string
-  payment_method: string
-  paid_at: string
-  created_at: string
+  id_transaksi: string
+  id_user: string
+  total_bayar: number | string
+  status: string
+  tanggal_bayar: string
   // joined fields
-  movie_title?: string
+  judul?: string
   poster_url?: string
-  hall_name?: string
-  cinema_name?: string
-  start_time?: string
-  end_time?: string
-  items?: OrderItem[]
+  nama_studio?: string
+  nama_bioskop?: string
+  jam_tayang?: string
+  jam_selesai?: string
+  tiket?: Array<{
+    id_tiket: string
+    barcode: string
+    status_tiket: string
+    nomor_kursi?: string
+    id_kursi?: string
+    judul?: string
+    poster_url?: string
+    jam_tayang?: string
+    nama_studio?: string
+    nama_bioskop?: string
+  }>
+  fnb_items?: Array<{
+    nama_item: string
+    qty: number
+    harga_saat_pesan: number
+  }>
 }
 
 interface TicketsState {
   myTickets: Ticket[]
-  lastPurchase: { order: any; qr_code: string; seats: any[] } | null
-  verifyResult: { valid: boolean; ticket?: any } | null
+  lastPurchase: PurchaseResult | null
+  verifyResult: VerifyResult | null
   loading: boolean
   error: string | null
 }
@@ -48,11 +83,11 @@ const initialState: TicketsState = {
 export const buyTickets = createAsyncThunk(
   'tickets/buy',
   async (
-    data: { schedule_id: string; seat_ids: string[]; payment_method?: string },
+    data: { id_jadwal: string; kursi_ids: string[]; fnb_items?: Array<{ id_item: string; qty: number }> },
     { rejectWithValue },
   ) => {
     try {
-      const res = await api.post('/tickets/buy', data)
+      const res = await api.post('/tiket/buy', data)
       return res.data
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Purchase failed') }
   },
@@ -62,8 +97,8 @@ export const fetchMyTickets = createAsyncThunk(
   'tickets/fetchMy',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await api.get('/tickets/my')
-      return res.data.tickets as Ticket[]
+      const res = await api.get('/tiket/my')
+      return res.data.transactions as Ticket[]
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -72,7 +107,7 @@ export const verifyTicket = createAsyncThunk(
   'tickets/verify',
   async (barcode: string, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/tickets/verify/${barcode}`)
+      const res = await api.get(`/tiket/verify/${barcode}`)
       return res.data
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Not found') }
   },
@@ -80,9 +115,9 @@ export const verifyTicket = createAsyncThunk(
 
 export const getTicketBarcode = createAsyncThunk(
   'tickets/getBarcode',
-  async (orderId: string, { rejectWithValue }) => {
+  async (idTiket: string, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/tickets/${orderId}/barcode`)
+      const res = await api.get(`/tiket/${idTiket}/barcode`)
       return res.data
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },

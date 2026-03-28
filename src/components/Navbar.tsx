@@ -20,6 +20,8 @@ export default function Navbar() {
     navigate('/')
   }
 
+  const userInitial = (user?.nama?.trim()?.[0] || user?.email?.trim()?.[0] || 'U').toUpperCase()
+
   return (
     <AppBar position="sticky" sx={{ background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(10px)' }}>
       <Toolbar>
@@ -42,12 +44,12 @@ export default function Navbar() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {user ? (
             <>
-              {user.role === 'admin' && (
+              {user.role === 'Admin' && (
                 <Chip label="Admin" size="small" color="primary" sx={{ mr: 1 }} />
               )}
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
                 <Avatar sx={{ bgcolor: 'primary.main', width: 34, height: 34, fontSize: 14 }}>
-                  {user.username[0].toUpperCase()}
+                  {userInitial}
                 </Avatar>
               </IconButton>
               <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
@@ -56,7 +58,7 @@ export default function Navbar() {
                 </MenuItem>
                 <Divider />
                 <MenuItem onClick={() => { navigate('/tickets'); setAnchorEl(null) }}>My Tickets</MenuItem>
-                {user.role === 'admin' && (
+                {user.role === 'Admin' && (
                   <MenuItem onClick={() => { navigate('/admin'); setAnchorEl(null) }}>Admin Panel</MenuItem>
                 )}
                 <Divider />

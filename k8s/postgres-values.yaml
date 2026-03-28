@@ -1,0 +1,43 @@
+# Bitnami PostgreSQL HA Helm chart values
+# Install with:
+#   helm install cinema-postgresql-ha oci://registry-1.docker.io/bitnamicharts/postgresql-ha \
+#     -n cinema -f k8s/postgres-values.yaml
+
+postgresql:
+  replicaCount: 2          # 1 primary + 1 read replica
+  username: cinema_user
+  database: cinema_db
+  # Passwords are read from the existing K8s Secret "cinema-pg-passwords".
+  # Create this secret BEFORE installing the Helm chart (see configmap-secret.yaml).
+  existingSecret: cinema-pg-passwords
+  podAntiAffinityPreset: soft
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: postgresql
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+pgpool:
+  replicaCount: 1
+  podAntiAffinityPreset: soft
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+persistence:
+  enabled: true
+  size: 5Gi
+  # storageClass: "" # uses default StorageClass (e.g., local-path)

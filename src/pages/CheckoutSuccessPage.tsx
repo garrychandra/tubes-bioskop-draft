@@ -23,7 +23,7 @@ export default function CheckoutSuccessPage() {
     )
   }
 
-  const { order, seats } = lastPurchase
+  const { transaksi, tiket, qr_code } = lastPurchase
 
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
@@ -37,12 +37,12 @@ export default function CheckoutSuccessPage() {
         {/* QR Code */}
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
           <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2 }}>
-            <QRCodeSVG value={order.barcode_data} size={200} />
+            <QRCodeSVG value={tiket[0]?.barcode || ''} size={200} />
           </Box>
         </Box>
 
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3, fontFamily: 'monospace' }}>
-          {order.barcode_data}
+          {tiket[0]?.barcode || qr_code}
         </Typography>
 
         <Divider sx={{ mb: 3 }} />
@@ -51,22 +51,22 @@ export default function CheckoutSuccessPage() {
         <Box sx={{ textAlign: 'left', mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography color="text.secondary">Order ID</Typography>
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{order.id.slice(0, 8).toUpperCase()}</Typography>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{transaksi.id_transaksi.slice(0, 8).toUpperCase()}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography color="text.secondary">Status</Typography>
-            <Chip label={order.status.toUpperCase()} color="success" size="small" />
+            <Chip label="PAID" color="success" size="small" />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography color="text.secondary">Seats</Typography>
             <Typography variant="body2">
-              {seats.map((s: any) => `${s.row_label}${s.col_number}`).join(', ')}
+              {tiket.map((t: any) => t.nomor_kursi || t.id_kursi).join(', ')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography color="text.secondary">Total Paid</Typography>
             <Typography variant="h6" color="primary.main" sx={{ fontWeight: 800 }}>
-              Rp{Number(order.total_price).toLocaleString()}
+              Rp{Number(transaksi.total_bayar).toLocaleString()}
             </Typography>
           </Box>
         </Box>

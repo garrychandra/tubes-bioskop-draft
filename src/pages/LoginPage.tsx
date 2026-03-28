@@ -3,27 +3,41 @@ import {
   Container, Paper, Typography, TextField, Button,
   Box, Alert, CircularProgress, Link,
 } from '@mui/material'
-import { useNavigate, Link as RouterLink } from 'react-router-dom'
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { login, clearError } from '../features/auth/authSlice'
 import MovieIcon from '@mui/icons-material/Movie'
 
+interface LoginLocationState {
+  from?: {
+    pathname?: string
+    search?: string
+  }
+}
+
 export default function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
   const { loading, error, user } = useAppSelector((s) => s.auth)
   const [form, setForm] = useState({ email: '', password: '' })
+  const locationState = location.state as LoginLocationState | null
+  const redirectFromQuery = new URLSearchParams(location.search).get('redirect')
+  const redirectFromState = locationState?.from?.pathname
+    ? `${locationState.from.pathname}${locationState.from.search || ''}`
+    : null
+  const redirectTo = redirectFromQuery || redirectFromState || '/'
 
   useEffect(() => {
-    if (user) navigate('/')
-  }, [user, navigate])
+    if (user) navigate(redirectTo, { replace: true })
+  }, [user, navigate, redirectTo])
 
   if (user) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const result = await dispatch(login(form))
-    if (login.fulfilled.match(result)) navigate('/')
+    if (login.fulfilled.match(result)) navigate(redirectTo, { replace: true })
   }
 
   return (
@@ -60,7 +74,7 @@ export default function LoginPage() {
         <Box sx={{ textAlign: 'center', mt: 3 }}>
           <Typography variant="body2" color="text.secondary">
             Don't have an account?{' '}
-            <Link component={RouterLink} to="/register" color="primary">Register</Link>
+            <Link component={RouterLink} to={`/register?redirect=${encodeURIComponent(redirectTo)}`} color="primary">Register</Link>
           </Typography>
         </Box>
 

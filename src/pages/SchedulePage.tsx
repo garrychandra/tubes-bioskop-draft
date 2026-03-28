@@ -28,19 +28,19 @@ export default function SchedulePage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const cinemaId = searchParams.get('cinema_id') || undefined
+  const idBioskop = searchParams.get('id_bioskop') || undefined
   const { items: schedules, loading } = useAppSelector((s) => s.schedules)
 
   const dateOptions = useMemo(() => [getDateStr(0), getDateStr(1), getDateStr(2)], [])
   const [date, setDate] = useState(dateOptions[0])
 
   useEffect(() => {
-    dispatch(fetchSchedules({ date, cinema_id: cinemaId }))
-  }, [dispatch, date, cinemaId])
+    dispatch(fetchSchedules({ date, id_bioskop: idBioskop }))
+  }, [dispatch, date, idBioskop])
 
   // Group by cinema
   const byCinema = schedules.reduce((acc: any, sc) => {
-    const key = sc.cinema_name
+    const key = sc.nama_bioskop || 'Unknown Cinema'
     if (!acc[key]) acc[key] = []
     acc[key].push(sc)
     return acc
@@ -78,29 +78,29 @@ export default function SchedulePage() {
             <Divider sx={{ mb: 3 }} />
             <Grid container spacing={2}>
               {cinemaSchedules.map((sc: any) => (
-                <Grid item xs={12} sm={6} md={4} key={sc.id}>
+                <Grid item xs={12} sm={6} md={4} key={sc.id_jadwal}>
                   <Card sx={{ display: 'flex', gap: 2, p: 2 }}>
                     <Box
                       component="img"
-                      src={sc.poster_url}
-                      alt={sc.movie_title}
+                      src={sc.poster_url || 'https://via.placeholder.com/70x100'}
+                      alt={sc.judul || 'Movie Poster'}
                       sx={{ width: 70, height: 100, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
                     />
                     <CardContent sx={{ p: 0, flexGrow: 1, '&:last-child': { pb: 0 } }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>{sc.movie_title}</Typography>
-                      <Typography variant="caption" color="text.secondary">{sc.hall_name}</Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>{sc.judul || 'Untitled Movie'}</Typography>
+                      <Typography variant="caption" color="text.secondary">{sc.nama_studio || '-'}</Typography>
                       <Box sx={{ my: 1 }}>
                         <Chip
-                          label={new Date(sc.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          label={new Date(sc.jam_tayang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                           size="small" color="primary"
                         />
                       </Box>
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Regular: Rp{Number(sc.price_regular).toLocaleString()}
+                        Regular: Rp{Number(sc.harga_tiket).toLocaleString()}
                       </Typography>
                       <Button
                         size="small" variant="outlined" fullWidth sx={{ mt: 1 }}
-                        onClick={() => navigate(`/schedules/${sc.id}/seats`)}
+                        onClick={() => navigate(`/schedules/${sc.id_jadwal}/seats`)}
                       >
                         Book
                       </Button>

@@ -51,11 +51,11 @@ export default function AdminDashboard() {
 
   // Movie form state
   const [movieDialog, setMovieDialog] = useState(false)
-  const [movieForm, setMovieForm] = useState({ title: '', genre: '', duration_min: 120, poster_url: '', description: '', status: 'now_showing', rating: 7 })
+  const [movieForm, setMovieForm] = useState<{ judul: string; genre: string; durasi: number; poster_url: string; deskripsi: string; status: 'now_showing' | 'coming_soon' | 'ended' }>({ judul: '', genre: '', durasi: 120, poster_url: '', deskripsi: '', status: 'now_showing' })
 
   // Schedule form state
   const [schedDialog, setSchedDialog] = useState(false)
-  const [schedForm, setSchedForm] = useState<{ movie_id: string; hall_id: string; start_time: string; price_regular: number; price_vip: number }>({ movie_id: '', hall_id: '', start_time: '', price_regular: 50000, price_vip: 100000 })
+  const [schedForm, setSchedForm] = useState<{ id_film: string; id_studio: string; jam_tayang: string; harga_tiket: number }>({ id_film: '', id_studio: '', jam_tayang: '', harga_tiket: 50000 })
 
   useEffect(() => {
     dispatch(fetchAdminStats())
@@ -64,11 +64,11 @@ export default function AdminDashboard() {
     dispatch(fetchMovies({}))
     dispatch(fetchSchedules(undefined))
     // Fetch halls for schedule creation
-    api.get('/cinemas').then(async (res) => {
-      const cinemas = res.data.cinemas || []
-      const hallRequests = cinemas.map((cinema: any) =>
-        api.get(`/cinemas/${cinema.id}/halls`).then((h) =>
-          (h.data.halls || []).map((hall: any) => ({ ...hall, cinema_name: cinema.name }))
+    api.get('/bioskop').then(async (res) => {
+      const bioskop = res.data.bioskop || []
+      const hallRequests = bioskop.map((b: any) =>
+        api.get(`/bioskop/${b.id_bioskop}/studios`).then((h) =>
+          (h.data.studios || []).map((studio: any) => ({ ...studio, nama_bioskop: b.nama_bioskop }))
         ).catch(() => [])
       )
       const results = await Promise.all(hallRequests)
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
 
   const handleCreateMovie = async () => {
     const result = await dispatch(createMovie(movieForm as any))
-    if (createMovie.fulfilled.match(result)) { setMovieDialog(false); setMovieForm({ title: '', genre: '', duration_min: 120, poster_url: '', description: '', status: 'now_showing', rating: 7 }) }
+    if (createMovie.fulfilled.match(result)) { setMovieDialog(false); setMovieForm({ judul: '', genre: '', durasi: 120, poster_url: '', deskripsi: '', status: 'now_showing' }) }
   }
 
   const handleCreateSchedule = async () => {
@@ -124,13 +124,13 @@ export default function AdminDashboard() {
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <StatCard title="Orders Paid" icon={<ConfirmationNumberIcon sx={{ color: 'white' }} />}
-                value={stats?.orders?.paid || 0} color="#388e3c"
-                sub={`${stats?.orders?.used || 0} used`}
+                value={stats?.tiket?.active || 0} color="#388e3c"
+                sub={`${stats?.tiket?.used || 0} used`}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <StatCard title="Movies" icon={<MovieIcon sx={{ color: 'white' }} />}
-                value={stats?.total_movies || 0} color="#7b1fa2" />
+                value={stats?.total_films || 0} color="#7b1fa2" />
             </Grid>
           </Grid>
 
@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                 <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis stroke="#888" tick={{ fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#141414', border: '1px solid #333' }} labelStyle={{ color: '#fff' }} />
-                <Bar dataKey="orders" fill="#f5c518" radius={[4,4,0,0]} />
+                <Bar dataKey="transactions" fill="#f5c518" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -197,22 +197,22 @@ export default function AdminDashboard() {
               </TableHead>
               <TableBody>
                 {movies.map((m) => (
-                  <TableRow key={m.id}>
+                  <TableRow key={m.id_film}>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box component="img" src={m.poster_url} sx={{ width: 36, height: 54, objectFit: 'cover', borderRadius: 0.5 }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{m.title}</Typography>
+                        <Box component="img" src={m.poster_url || ''} sx={{ width: 36, height: 54, objectFit: 'cover', borderRadius: 0.5 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{m.judul}</Typography>
                       </Box>
                     </TableCell>
                     <TableCell><Typography variant="body2">{m.genre}</Typography></TableCell>
-                    <TableCell><Typography variant="body2">{m.duration_min}m</Typography></TableCell>
-                    <TableCell><Typography variant="body2">{m.rating}</Typography></TableCell>
+                    <TableCell><Typography variant="body2">{m.durasi}m</Typography></TableCell>
+                    <TableCell><Typography variant="body2">{m.avg_rating}</Typography></TableCell>
                     <TableCell>
                       <Chip label={m.status} size="small"
                         color={m.status === 'now_showing' ? 'success' : m.status === 'coming_soon' ? 'warning' : 'default'} />
                     </TableCell>
                     <TableCell>
-                      <Button size="small" color="error" onClick={() => dispatch(deleteMovie(m.id))}>Delete</Button>
+                      <Button size="small" color="error" onClick={() => dispatch(deleteMovie(m.id_film))}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -224,15 +224,14 @@ export default function AdminDashboard() {
           <Dialog open={movieDialog} onClose={() => setMovieDialog(false)} maxWidth="sm" fullWidth>
             <DialogTitle>Add New Movie</DialogTitle>
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
-              <TextField label="Title" value={movieForm.title} onChange={(e) => setMovieForm({ ...movieForm, title: e.target.value })} required fullWidth />
+              <TextField label="Title" value={movieForm.judul} onChange={(e) => setMovieForm({ ...movieForm, judul: e.target.value })} required fullWidth />
               <TextField label="Genre" value={movieForm.genre} onChange={(e) => setMovieForm({ ...movieForm, genre: e.target.value })} fullWidth />
-              <TextField label="Duration (min)" type="number" value={movieForm.duration_min} onChange={(e) => setMovieForm({ ...movieForm, duration_min: Number(e.target.value) })} fullWidth />
-              <TextField label="Rating (0-10)" type="number" value={movieForm.rating} onChange={(e) => setMovieForm({ ...movieForm, rating: Number(e.target.value) })} fullWidth inputProps={{ min: 0, max: 10, step: 0.1 }} />
+              <TextField label="Duration (min)" type="number" value={movieForm.durasi} onChange={(e) => setMovieForm({ ...movieForm, durasi: Number(e.target.value) })} fullWidth />
               <TextField label="Poster URL" value={movieForm.poster_url} onChange={(e) => setMovieForm({ ...movieForm, poster_url: e.target.value })} fullWidth />
-              <TextField label="Description" value={movieForm.description} onChange={(e) => setMovieForm({ ...movieForm, description: e.target.value })} fullWidth multiline rows={3} />
+              <TextField label="Description" value={movieForm.deskripsi} onChange={(e) => setMovieForm({ ...movieForm, deskripsi: e.target.value })} fullWidth multiline rows={3} />
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
-                <Select value={movieForm.status} label="Status" onChange={(e) => setMovieForm({ ...movieForm, status: e.target.value })}>
+                <Select value={movieForm.status} label="Status" onChange={(e) => setMovieForm({ ...movieForm, status: e.target.value as 'now_showing' | 'coming_soon' | 'ended' })}>
                   <MenuItem value="now_showing">Now Showing</MenuItem>
                   <MenuItem value="coming_soon">Coming Soon</MenuItem>
                   <MenuItem value="ended">Ended</MenuItem>
@@ -266,13 +265,13 @@ export default function AdminDashboard() {
               </TableHead>
               <TableBody>
                 {schedules.map((sc) => (
-                  <TableRow key={sc.id}>
-                    <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{sc.movie_title}</Typography></TableCell>
-                    <TableCell><Typography variant="body2">{sc.cinema_name} · {sc.hall_name}</Typography></TableCell>
-                    <TableCell><Typography variant="body2">{new Date(sc.start_time).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</Typography></TableCell>
-                    <TableCell><Typography variant="body2">Rp{Number(sc.price_regular).toLocaleString()}</Typography></TableCell>
+                  <TableRow key={sc.id_jadwal}>
+                    <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{sc.judul}</Typography></TableCell>
+                    <TableCell><Typography variant="body2">{sc.nama_bioskop} · {sc.nama_studio}</Typography></TableCell>
+                    <TableCell><Typography variant="body2">{new Date(sc.jam_tayang).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</Typography></TableCell>
+                    <TableCell><Typography variant="body2">Rp{Number(sc.harga_tiket).toLocaleString()}</Typography></TableCell>
                     <TableCell>
-                      <Button size="small" color="error" onClick={() => dispatch(deleteSchedule(sc.id))}>Delete</Button>
+                      <Button size="small" color="error" onClick={() => dispatch(deleteSchedule(sc.id_jadwal))}>Delete</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -286,23 +285,21 @@ export default function AdminDashboard() {
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
               <FormControl fullWidth>
                 <InputLabel>Movie</InputLabel>
-                <Select value={schedForm.movie_id} label="Movie" onChange={(e) => setSchedForm({ ...schedForm, movie_id: e.target.value })}>
-                  {movies.map((m) => <MenuItem key={m.id} value={m.id}>{m.title}</MenuItem>)}
+                <Select value={schedForm.id_film} label="Movie" onChange={(e) => setSchedForm({ ...schedForm, id_film: e.target.value })}>
+                  {movies.map((m) => <MenuItem key={m.id_film} value={m.id_film}>{m.judul}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControl fullWidth>
                 <InputLabel>Hall</InputLabel>
-                <Select value={schedForm.hall_id} label="Hall" onChange={(e) => setSchedForm({ ...schedForm, hall_id: e.target.value })}>
-                  {halls.map((h: any) => <MenuItem key={h.id} value={h.id}>{h.cinema_name} — {h.name}</MenuItem>)}
+                <Select value={schedForm.id_studio} label="Hall" onChange={(e) => setSchedForm({ ...schedForm, id_studio: e.target.value })}>
+                  {halls.map((h: any) => <MenuItem key={h.id_studio} value={h.id_studio}>{h.nama_bioskop} - {h.nama_studio}</MenuItem>)}
                 </Select>
               </FormControl>
-              <TextField label="Start Time" type="datetime-local" value={schedForm.start_time}
-                onChange={(e) => setSchedForm({ ...schedForm, start_time: e.target.value })}
+              <TextField label="Start Time" type="datetime-local" value={schedForm.jam_tayang}
+                onChange={(e) => setSchedForm({ ...schedForm, jam_tayang: e.target.value })}
                 InputLabelProps={{ shrink: true }} fullWidth />
-              <TextField label="Price Regular (Rp)" type="number" value={schedForm.price_regular}
-                onChange={(e) => setSchedForm({ ...schedForm, price_regular: Number(e.target.value) })} fullWidth />
-              <TextField label="Price VIP (Rp)" type="number" value={schedForm.price_vip}
-                onChange={(e) => setSchedForm({ ...schedForm, price_vip: Number(e.target.value) })} fullWidth />
+              <TextField label="Price (Rp)" type="number" value={schedForm.harga_tiket}
+                onChange={(e) => setSchedForm({ ...schedForm, harga_tiket: Number(e.target.value) })} fullWidth />
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setSchedDialog(false)}>Cancel</Button>
@@ -328,12 +325,12 @@ export default function AdminDashboard() {
             </TableHead>
             <TableBody>
               {orders.map((o: any) => (
-                <TableRow key={o.id}>
-                  <TableCell><Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{o.id.slice(0, 8).toUpperCase()}</Typography></TableCell>
-                  <TableCell><Typography variant="body2">{o.username}<br /><span style={{ color: '#888', fontSize: 12 }}>{o.email}</span></Typography></TableCell>
-                  <TableCell><Typography variant="body2">{o.movie_title}</Typography></TableCell>
-                  <TableCell><Typography variant="body2">{new Date(o.start_time).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</Typography></TableCell>
-                  <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>Rp{Number(o.total_price).toLocaleString()}</Typography></TableCell>
+                <TableRow key={o.id_transaksi}>
+                  <TableCell><Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{o.id_transaksi.slice(0, 8).toUpperCase()}</Typography></TableCell>
+                  <TableCell><Typography variant="body2">{o.nama}<br /><span style={{ color: '#888', fontSize: 12 }}>{o.email}</span></Typography></TableCell>
+                  <TableCell><Typography variant="body2">-</Typography></TableCell>
+                  <TableCell><Typography variant="body2">{new Date(o.tanggal_bayar).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ fontWeight: 700 }}>Rp{Number(o.total_bayar).toLocaleString()}</Typography></TableCell>
                   <TableCell>
                     <Chip label={o.status} size="small"
                       color={o.status === 'paid' ? 'success' : o.status === 'used' ? 'default' : o.status === 'cancelled' ? 'error' : 'warning'} />
@@ -361,23 +358,23 @@ export default function AdminDashboard() {
             </TableHead>
             <TableBody>
               {users.map((u: any) => (
-                <TableRow key={u.id}>
+                <TableRow key={u.id_user}>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.username}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.nama}</Typography>
                     <Typography variant="caption" color="text.secondary">{u.email}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip label={u.role} size="small" color={u.role === 'admin' ? 'primary' : 'default'} />
+                    <Chip label={u.role} size="small" color={u.role === 'Admin' ? 'primary' : 'default'} />
                   </TableCell>
-                  <TableCell>{u.total_orders}</TableCell>
+                  <TableCell>{u.total_transactions}</TableCell>
                   <TableCell>Rp{Number(u.total_spent).toLocaleString()}</TableCell>
-                  <TableCell>{new Date(u.created_at).toLocaleDateString('id-ID')}</TableCell>
+                  <TableCell>-</TableCell>
                   <TableCell>
                     <Button
                       size="small" variant="outlined"
-                      onClick={() => dispatch(updateUserRole({ id: u.id, role: u.role === 'admin' ? 'user' : 'admin' }))}
+                      onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Admin' ? 'User' : 'Admin' }))}
                     >
-                      {u.role === 'admin' ? 'Demote' : 'Make Admin'}
+                      {u.role === 'Admin' ? 'Demote' : 'Make Admin'}
                     </Button>
                   </TableCell>
                 </TableRow>

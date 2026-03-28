@@ -2,24 +2,23 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import api from '../../services/api'
 
 export interface Schedule {
-  id: string
-  movie_id: string
-  hall_id: string
-  start_time: string
-  end_time: string
-  price_regular: number
-  price_vip: number
-  price_couple: number
-  movie_title: string
-  poster_url: string
-  duration_min: number
-  genre: string
-  hall_name: string
-  cinema_name: string
-  cinema_id: string
-  rows?: number
-  cols?: number
-  rating?: number
+  id_jadwal: string
+  id_film: string
+  id_studio: string
+  jam_tayang: string
+  jam_selesai: string
+  harga_tiket: number | string
+  judul?: string | null
+  poster_url?: string | null
+  durasi?: number
+  genre?: string | null
+  nama_studio?: string | null
+  nama_bioskop?: string | null
+  id_bioskop?: string
+  kapasitas?: number
+  lokasi?: string | null
+  avg_rating?: number | string
+  film_status?: string
 }
 
 interface SchedulesState {
@@ -33,10 +32,15 @@ const initialState: SchedulesState = { items: [], selected: null, loading: false
 
 export const fetchSchedules = createAsyncThunk(
   'schedules/fetchAll',
-  async (params: { movie_id?: string; date?: string; cinema_id?: string } | undefined, { rejectWithValue }) => {
+  async (params: { id_film?: string; date?: string; id_bioskop?: string } | undefined, { rejectWithValue }) => {
     try {
-      const res = await api.get('/schedules', { params })
-      return res.data.schedules as Schedule[]
+      const queryParams = {
+        id_film: params?.id_film,
+        id_bioskop: params?.id_bioskop,
+        date: params?.date,
+      }
+      const res = await api.get('/jadwal', { params: queryParams })
+      return res.data.jadwal as Schedule[]
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -45,16 +49,19 @@ export const fetchScheduleById = createAsyncThunk(
   'schedules/fetchById',
   async (id: string, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/schedules/${id}`)
-      return res.data.schedule as Schedule
+      const res = await api.get(`/jadwal/${id}`)
+      return res.data.jadwal as Schedule
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
 
 export const createSchedule = createAsyncThunk(
   'schedules/create',
-  async (data: any, { rejectWithValue }) => {
-    try { const res = await api.post('/schedules', data); return res.data.schedule }
+  async (data: { id_film: string; id_studio: string; jam_tayang: string; harga_tiket: number }, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/jadwal', data)
+      return res.data.jadwal as Schedule
+    }
     catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -62,7 +69,7 @@ export const createSchedule = createAsyncThunk(
 export const deleteSchedule = createAsyncThunk(
   'schedules/delete',
   async (id: string, { rejectWithValue }) => {
-    try { await api.delete(`/schedules/${id}`); return id }
+    try { await api.delete(`/jadwal/${id}`); return id }
     catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -82,7 +89,7 @@ const schedulesSlice = createSlice({
       .addCase(fetchScheduleById.fulfilled, (s, a) => { s.loading = false; s.selected = a.payload })
       .addCase(fetchScheduleById.rejected, (s, a) => { s.loading = false; s.error = a.payload as string })
       .addCase(createSchedule.fulfilled, (s, a) => { s.items.push(a.payload) })
-      .addCase(deleteSchedule.fulfilled, (s, a) => { s.items = s.items.filter(sc => sc.id !== a.payload) })
+      .addCase(deleteSchedule.fulfilled, (s, a) => { s.items = s.items.filter(sc => sc.id_jadwal !== a.payload) })
   },
 })
 

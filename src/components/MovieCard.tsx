@@ -24,7 +24,7 @@ export default function MovieCard({ movie }: Props) {
           component="img"
           height="360"
           image={movie.poster_url || 'https://via.placeholder.com/300x450?text=No+Poster'}
-          alt={movie.title}
+          alt={movie.judul}
           sx={{ objectFit: 'cover' }}
         />
         <Chip
@@ -36,24 +36,24 @@ export default function MovieCard({ movie }: Props) {
       </Box>
       <CardContent sx={{ flexGrow: 1, p: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, mb: 0.5 }} noWrap>
-          {movie.title}
+          {movie.judul}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
           {movie.genre}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Rating value={movie.rating / 2} precision={0.5} size="small" readOnly />
-          <Typography variant="caption" color="text.secondary">{movie.rating}/10</Typography>
+          <Rating value={Number(movie.avg_rating || 0) / 2} precision={0.5} size="small" readOnly />
+          <Typography variant="caption" color="text.secondary">{Number(movie.avg_rating || 0)}/10</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
           <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-          <Typography variant="caption" color="text.secondary">{movie.duration_min} min</Typography>
+          <Typography variant="caption" color="text.secondary">{movie.durasi} min</Typography>
         </Box>
       </CardContent>
       <CardActions sx={{ p: 2, pt: 0 }}>
         <Button
           fullWidth variant="contained" size="small"
-          onClick={() => navigate(`/movies/${movie.id}`)}
+          onClick={() => navigate(`/movies/${movie.id_film}`)}
         >
           Details & Book
         </Button>

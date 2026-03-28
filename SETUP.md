@@ -143,25 +143,33 @@ FRONTEND_URL=http://localhost:5173
 Install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
+
+Make sure PostgreSQL is running **before** migration commands.
 
 Run migrations (creates all database tables):
 
 ```bash
-npm run migrate
+pnpm migrate
+```
+
+Optional: check migration status
+
+```bash
+pnpm migrate:status
 ```
 
 Seed demo data:
 
 ```bash
-npm run seed
+pnpm seed
 ```
 
 Start the backend (with auto-reload via nodemon):
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 The API is now running at **http://localhost:5000/api**.
@@ -207,11 +215,178 @@ The frontend is now running at **http://localhost:5173** with hot-reload.
 
 ## Kubernetes Deployment
 
-For production-style deployment on a Kubernetes cluster.
+Production-style deployment on a **3-node Kubernetes cluster** using Proxmox VMs, with **kubeadm** for cluster bootstrap and **Helm** for PostgreSQL HA.
 
-### 1. Build and push Docker images
+### Cluster Overview
 
-Replace `your-registry` with your container registry (Docker Hub, GCR, ECR, etc.):
+| VM Name | Role | RAM | K8s Role |
+|---------|------|-----|----------|
+| **mdw** | Master / Control Plane | 4 GB | Runs etcd, API server, scheduler, controller-manager |
+| **sdw1** | Worker Node 1 | 4 GB | Runs application pods (FE, BE, PG) |
+| **sdw2** | Worker Node 2 | 4 GB | Runs application pods (FE, BE, PG) |
+
+### Architecture
+
+```
+                     mdw (Control Plane)
+                 ┌──────────────────────────┐
+                 │  kubeadm, etcd, API      │
+                 │  server, scheduler       │
+                 │  controller-manager      │
+                 └────────────┬─────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+     sdw1 (Worker Node 1)           sdw2 (Worker Node 2)
+  ┌──────────────────────┐      ┌──────────────────────┐
+  │  frontend pod        │      │  frontend pod        │
+  │  backend pod         │      │  backend pod         │
+  │  PG primary (5Gi)    │      │  PG replica (5Gi)    │
+  │  pgpool              │      │                      │
+  └──────────────────────┘      └──────────────────────┘
+
+  Ingress Controller (NGINX) exposed via NodePort on both workers
+```
+
+### Step 0 — Prerequisites
+
+Ensure all 3 VMs have:
+- Ubuntu 22.04 (or similar) installed
+- A static IP address on the same Proxmox bridge/VLAN
+- SSH access from your workstation
+- At least 2 vCPU and 4 GB RAM each
+
+### Step 1 — Prepare all 3 VMs
+
+Run these commands on **all 3 VMs** (mdw, sdw1, sdw2):
+
+```bash
+# Disable swap (required by kubelet)
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+# Load required kernel modules
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+# Set sysctl params
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sudo sysctl --system
+
+# Install containerd
+sudo apt-get update
+sudo apt-get install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+# Install kubeadm, kubelet, kubectl
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+sudo systemctl enable kubelet
+```
+
+### Step 2 — Initialize the master node (mdw)
+
+On **mdw** only:
+
+```bash
+# Initialize the control plane (replace with mdw's actual IP)
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=<MDW_IP>
+
+# Set up kubectl for your user
+mkdir -p $HOME/.kube
+sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Install Calico CNI for pod networking
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+
+# Verify master is Ready
+kubectl get nodes
+```
+
+> **Save the `kubeadm join` command** that appears in the output — you'll need it for the workers.
+
+### Step 3 — Join worker nodes (sdw1, sdw2)
+
+On **sdw1** and **sdw2**, run the join command from Step 2:
+
+```bash
+# Paste the kubeadm join command from the master output, e.g.:
+sudo kubeadm join <MDW_IP>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+Verify on **mdw**:
+
+```bash
+kubectl get nodes
+# NAME   STATUS   ROLES           AGE   VERSION
+# mdw    Ready    control-plane   5m    v1.30.x
+# sdw1   Ready    <none>          2m    v1.30.x
+# sdw2   Ready    <none>          2m    v1.30.x
+```
+
+### Step 4 — Install Helm 3 (on mdw)
+
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
+```
+
+### Step 5 — Install a storage provisioner
+
+kubeadm doesn't include a dynamic storage provisioner. Install **local-path-provisioner** so PVCs are automatically fulfilled:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.26/deploy/local-path-storage.yaml
+
+# Set it as the default StorageClass
+kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+```
+
+### Step 6 — Install NGINX Ingress Controller
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install with NodePort (since Proxmox has no cloud load balancer)
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx --create-namespace \
+  --set controller.service.type=NodePort \
+  --set controller.service.nodePorts.http=30080 \
+  --set controller.service.nodePorts.https=30443
+```
+
+The ingress will be accessible at `http://<any-worker-ip>:30080`.
+
+> **Optional: Install MetalLB** for proper LoadBalancer IPs on your LAN:
+>
+> ```bash
+> helm repo add metallb https://metallb.github.io/metallb
+> helm install metallb metallb/metallb --namespace metallb-system --create-namespace
+> ```
+>
+> Then create an `IPAddressPool` and `L2Advertisement` resource with a range of free IPs on your Proxmox VLAN.
+
+### Step 7 — Build and push Docker images
+
+Replace `your-registry` with your container registry (Docker Hub, private registry, etc.):
 
 ```bash
 # Build backend
@@ -225,93 +400,114 @@ docker build \
 docker push your-registry/cinema-frontend:latest
 ```
 
-### 2. Update image references in K8s manifests
+Update image references in `k8s/backend.yaml`, `k8s/frontend.yaml`, and `k8s/migration-job.yaml`.
 
-Edit these files to replace `your-registry/cinema-backend:latest` and `your-registry/cinema-frontend:latest` with your actual image paths:
-
-- `k8s/backend.yaml`
-- `k8s/frontend.yaml`
-
-### 3. Update secrets and config
+### Step 8 — Update secrets for production
 
 Edit `k8s/configmap-secret.yaml`:
 
 ```yaml
-# Update these values for production:
+# In cinema-secrets — change these for production:
 stringData:
   DB_PASSWORD: <your-secure-db-password>
   JWT_SECRET: <your-secure-jwt-secret>
+
+# In cinema-pg-passwords — change these for production:
+stringData:
+  password: <your-secure-db-password>        # must match DB_PASSWORD above
+  repmgr-password: <secure-repmgr-password>
+  admin-password: <secure-admin-password>
 ```
 
 Edit `k8s/frontend.yaml` ingress section:
 
 ```yaml
-# Replace with your actual domain:
+# Replace with your actual domain (or use /etc/hosts to map a worker IP):
 - host: cinema.example.com
 ```
 
-### 4. Apply the manifests (in order)
+### Step 9 — Deploy everything (in order)
 
 ```bash
-# Create namespace
+# 1. Create namespace
 kubectl apply -f k8s/namespace.yaml
 
-# Create config and secrets
+# 2. Create config and secrets
 kubectl apply -f k8s/configmap-secret.yaml
 
-# Deploy PostgreSQL (waits for PVC + readiness probe)
-kubectl apply -f k8s/postgres.yaml
+# 3. Deploy PostgreSQL HA via Helm (2 replicas + pgpool)
+helm install cinema-postgresql-ha oci://registry-1.docker.io/bitnamicharts/postgresql-ha \
+  -n cinema -f k8s/postgres-values.yaml
 
-# Wait for postgres to be ready
-kubectl -n cinema wait --for=condition=ready pod -l app=cinema-postgres --timeout=120s
+# 4. Wait for PostgreSQL to be ready
+kubectl -n cinema rollout status statefulset/cinema-postgresql-ha-postgresql --timeout=180s
 
-# Deploy backend (init container runs migrations + seed)
+# 5. Run database migrations (one-shot Job)
+kubectl apply -f k8s/migration-job.yaml
+kubectl -n cinema wait --for=condition=complete job/cinema-migrate --timeout=120s
+
+# 6. Deploy backend (2 replicas, spread across workers)
 kubectl apply -f k8s/backend.yaml
 
-# Deploy frontend + ingress
+# 7. Deploy frontend + ingress (2 replicas, spread across workers)
 kubectl apply -f k8s/frontend.yaml
 ```
 
-### 5. Verify deployment
+### Step 10 — Verify deployment
 
 ```bash
-# Check all pods are running
-kubectl -n cinema get pods
+# All pods running and distributed across workers
+kubectl -n cinema get pods -o wide
 
-# Check services
+# Services
 kubectl -n cinema get svc
 
-# Check ingress
+# Ingress
 kubectl -n cinema get ingress
 
-# View backend logs
+# Helm release status
+helm status cinema-postgresql-ha -n cinema
+
+# Check PostgreSQL replication
+kubectl -n cinema exec -it cinema-postgresql-ha-postgresql-0 -- \
+  psql -U postgres -c "SELECT client_addr, state FROM pg_stat_replication;"
+
+# Backend logs
 kubectl -n cinema logs -l app=cinema-backend --tail=50
 
-# View init container (migration) logs
-kubectl -n cinema logs -l app=cinema-backend -c migrate
+# Migration job logs
+kubectl -n cinema logs job/cinema-migrate
+
+# Test health endpoint
+kubectl -n cinema port-forward svc/cinema-backend-service 5000:5000 &
+curl http://localhost:5000/health
 ```
 
-### K8s Architecture Overview
+Access the app at `http://<sdw1-or-sdw2-ip>:30080` (or via your domain if using MetalLB + DNS).
 
+### Tear down
+
+```bash
+# Delete app resources
+kubectl delete -f k8s/frontend.yaml
+kubectl delete -f k8s/backend.yaml
+kubectl -n cinema delete job cinema-migrate
+
+# Delete PostgreSQL HA
+helm uninstall cinema-postgresql-ha -n cinema
+
+# Delete config and namespace
+kubectl delete -f k8s/configmap-secret.yaml
+kubectl delete -f k8s/namespace.yaml
 ```
-                           Ingress (cinema.example.com)
-                           ┌──────────┬──────────┐
-                           │  /api/*  │    /*    │
-                           ▼          ▼          │
-              cinema-backend-service   cinema-frontend-service
-              (ClusterIP:5000)         (LoadBalancer:80)
-                   │                        │
-              ┌────┴────┐             ┌─────┴─────┐
-              │ Backend │ x2 replicas │ Frontend  │ x2 replicas
-              │ (Node)  │             │ (Nginx)   │
-              └────┬────┘             └───────────┘
-                   │
-         cinema-postgres-service
-              (ClusterIP:5432)
-                   │
-              ┌────┴────┐
-              │PostgreSQL│  ← PVC (5Gi)
-              └─────────┘
+
+### Re-running migrations
+
+```bash
+# Delete the old job, then re-apply
+kubectl -n cinema delete job cinema-migrate
+kubectl apply -f k8s/migration-job.yaml
+kubectl -n cinema wait --for=condition=complete job/cinema-migrate --timeout=120s
 ```
 
 ---
@@ -376,10 +572,13 @@ Admin has access to the admin dashboard at [/admin](http://localhost:5173/admin)
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start with nodemon (auto-reload) |
-| `npm start` | Start in production mode |
-| `npm run migrate` | Run database migrations |
-| `npm run seed` | Seed demo data |
+| `pnpm dev` | Start with nodemon (auto-reload) |
+| `pnpm start` | Start in production mode |
+| `pnpm migrate` | Run pending Sequelize migrations |
+| `pnpm migrate:status` | Show migration status |
+| `pnpm migrate:undo` | Undo last migration |
+| `pnpm seed` | Run Sequelize seeders |
+| `pnpm seed:undo` | Undo all seeders |
 
 ### Docker
 
@@ -404,6 +603,8 @@ The backend can't reach PostgreSQL. Check:
 - Is `DB_HOST` correct? Use `localhost` for local, `postgres` for Docker Compose
 - Is port `5432` available? (`lsof -i :5432` or `netstat -an | findstr 5432`)
 
+If you run `pnpm migrate` or `pnpm migrate:status` while PostgreSQL is down, Sequelize CLI will fail with connection/authentication errors.
+
 ### "CORS error" in browser console
 
 The frontend origin doesn't match `FRONTEND_URL` in backend config:
@@ -417,7 +618,14 @@ The frontend origin doesn't match `FRONTEND_URL` in backend config:
 
 ### Migrations fail or schema is out of sync
 
-`npm run migrate` uses Sequelize `sync({ force: true })` which **drops and recreates** all managed tables. Run it whenever you need a clean schema. If you want a full clean slate:
+This project now uses **Sequelize CLI migrations** (`db:migrate`) and **does not** use `sequelize.sync({ force: true })`.
+
+If schema migration fails:
+- Ensure PostgreSQL is running and credentials in `backend/.env` match your DB.
+- Check migration state with `pnpm migrate:status`.
+- Retry with `pnpm migrate`.
+
+If you want a full clean slate:
 
 ```bash
 # Docker Compose
@@ -427,13 +635,20 @@ docker compose up --build
 # Local
 # Drop and recreate the database:
 psql -U cinema_user -c "DROP DATABASE cinema_db; CREATE DATABASE cinema_db;"
-npm run migrate
-npm run seed
+pnpm migrate
+pnpm seed
 ```
 
-### Seed says "Database already seeded — skipping."
+### Seeder does not run again
 
-Data already exists (detected by checking the `bioskop` count). To re-seed, run `npm run migrate` first to drop all tables, then `npm run seed` again.
+Sequelize CLI records executed seeders in `sequelize_data`, so `pnpm seed` only runs new seed files.
+
+To rerun all seeders:
+
+```bash
+pnpm seed:undo
+pnpm seed
+```
 
 ### Port already in use
 

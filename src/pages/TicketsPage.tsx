@@ -36,23 +36,27 @@ export default function TicketsPage() {
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {myTickets.map((ticket) => (
-            <Paper key={ticket.id} sx={{ p: 3, display: 'flex', gap: 3 }}>
+          {myTickets.map((ticket) => {
+            const firstTicket = ticket.tiket?.[0]
+            return (
+            <Paper key={ticket.id_transaksi} sx={{ p: 3, display: 'flex', gap: 3 }}>
               <Box
                 component="img"
-                src={ticket.poster_url || 'https://via.placeholder.com/80x120'}
-                alt={ticket.movie_title}
+                src={firstTicket?.poster_url || ticket.poster_url || 'https://via.placeholder.com/80x120'}
+                alt={firstTicket?.judul || ticket.judul || 'Movie Poster'}
                 sx={{ width: 80, height: 120, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
               />
               <Box sx={{ flexGrow: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{ticket.movie_title}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{firstTicket?.judul || ticket.judul || 'Untitled Movie'}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {ticket.cinema_name} · {ticket.hall_name}
+                      {firstTicket?.nama_bioskop || ticket.nama_bioskop || '-'} · {firstTicket?.nama_studio || ticket.nama_studio || '-'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {ticket.start_time && new Date(ticket.start_time).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                      {(firstTicket?.jam_tayang || ticket.jam_tayang)
+                        ? new Date((firstTicket?.jam_tayang || ticket.jam_tayang) as string).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
+                        : '-'}
                     </Typography>
                   </Box>
                   <Chip label={ticket.status.toUpperCase()} color={statusColor(ticket.status) as any} size="small" />
@@ -61,10 +65,10 @@ export default function TicketsPage() {
                 <Divider sx={{ my: 1.5 }} />
 
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {ticket.items?.map((item) => (
+                  {ticket.tiket?.map((item) => (
                     <Chip
-                      key={item.seat_id}
-                      label={`${item.row_label}${item.col_number} (${item.seat_type})`}
+                      key={item.id_tiket}
+                      label={`${item.nomor_kursi || '-'} (${item.status_tiket})`}
                       size="small" variant="outlined"
                     />
                   ))}
@@ -72,12 +76,12 @@ export default function TicketsPage() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>
                   <Typography variant="h6" color="primary.main" sx={{ fontWeight: 800 }}>
-                    Rp{Number(ticket.total_price).toLocaleString()}
+                    Rp{Number(ticket.total_bayar).toLocaleString()}
                   </Typography>
-                  {ticket.status === 'paid' && (
+                  {ticket.status === 'paid' && ticket.tiket && ticket.tiket.length > 0 && (
                     <Button
                       variant="outlined" startIcon={<QrCodeIcon />} size="small"
-                      onClick={() => setQrOpen(ticket.barcode_data)}
+                      onClick={() => setQrOpen(ticket.tiket![0].barcode)}
                     >
                       Show QR
                     </Button>
@@ -85,7 +89,8 @@ export default function TicketsPage() {
                 </Box>
               </Box>
             </Paper>
-          ))}
+            )
+          })}
         </Box>
       )}
 

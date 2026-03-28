@@ -10,12 +10,10 @@ interface Props {
 }
 
 const SEAT_COLORS = {
-  available_regular: '#2d2d2d',
-  available_vip: '#1a2a1a',
-  available_couple: '#1a1a2a',
+  available: '#2e7d32',
   selected: '#e50914',
-  locked: '#555',
-  booked: '#333',
+  locked: '#1565c0',
+  occupied: '#8b1e1e',
   mine_locked: '#ff6b35',
 }
 
@@ -23,30 +21,37 @@ export default function SeatMap({ seats, selectedSeats, currentUserId, onToggle,
 
   if (!seats.length) return <Typography color="text.secondary">No seats available</Typography>
 
+  const parseSeat = (nomorKursi: string) => {
+    const match = /^([A-Za-z]+)(\d+)$/.exec(nomorKursi)
+    if (!match) return { rowLabel: nomorKursi, colNumber: Number.MAX_SAFE_INTEGER }
+    return {
+      rowLabel: match[1].toUpperCase(),
+      colNumber: Number(match[2]),
+    }
+  }
+
   // Group by row
   const rowMap = new Map<string, Seat[]>()
   for (const seat of seats) {
-    const row = seat.row_label
+    const row = parseSeat(seat.nomor_kursi).rowLabel
     if (!rowMap.has(row)) rowMap.set(row, [])
     rowMap.get(row)!.push(seat)
   }
   const rows = Array.from(rowMap.entries()).sort(([a], [b]) => a.localeCompare(b))
 
   const getSeatColor = (seat: Seat) => {
-    if (selectedSeats.includes(seat.id)) return SEAT_COLORS.selected
-    if (seat.status === 'booked') return SEAT_COLORS.booked
+    if (selectedSeats.includes(seat.id_kursi)) return SEAT_COLORS.selected
+    if (seat.status === 'occupied') return SEAT_COLORS.occupied
     if (seat.status === 'locked') {
       if (seat.locked_by === currentUserId) return SEAT_COLORS.mine_locked
       return SEAT_COLORS.locked
     }
-    if (seat.seat_type === 'vip') return SEAT_COLORS.available_vip
-    if (seat.seat_type === 'couple') return SEAT_COLORS.available_couple
-    return SEAT_COLORS.available_regular
+    return SEAT_COLORS.available
   }
 
   const isClickable = (seat: Seat) => {
     if (disabled) return false
-    if (seat.status === 'booked') return false
+    if (seat.status === 'occupied') return false
     if (seat.status === 'locked' && seat.locked_by !== currentUserId) return false
     return true
   }
@@ -70,26 +75,22 @@ export default function SeatMap({ seats, selectedSeats, currentUserId, onToggle,
             <Typography variant="caption" sx={{ width: 16, color: 'text.secondary', textAlign: 'center' }}>
               {rowLabel}
             </Typography>
-            {rowSeats.sort((a, b) => a.col_number - b.col_number).map((seat) => (
+            {rowSeats.sort((a, b) => parseSeat(a.nomor_kursi).colNumber - parseSeat(b.nomor_kursi).colNumber).map((seat) => (
               <Tooltip
-                key={seat.id}
-                title={`${seat.row_label}${seat.col_number} — ${seat.seat_type} — ${seat.status}`}
+                key={seat.id_kursi}
+                title={`${seat.nomor_kursi} — ${seat.status}`}
                 arrow
               >
                 <Box
-                  onClick={() => isClickable(seat) && onToggle(seat.id)}
+                  onClick={() => isClickable(seat) && onToggle(seat.id_kursi)}
                   sx={{
-                    width: seat.seat_type === 'couple' ? 44 : 28,
+                    width: 28,
                     height: 26,
                     borderRadius: '4px 4px 0 0',
                     bgcolor: getSeatColor(seat),
                     border: '1px solid',
-                    borderColor: selectedSeats.includes(seat.id)
+                    borderColor: selectedSeats.includes(seat.id_kursi)
                       ? 'primary.main'
-                      : seat.seat_type === 'vip'
-                      ? '#2e5c2e'
-                      : seat.seat_type === 'couple'
-                      ? '#2e2e5c'
                       : '#444',
                     cursor: isClickable(seat) ? 'pointer' : 'not-allowed',
                     transition: 'all 0.15s',
@@ -100,7 +101,7 @@ export default function SeatMap({ seats, selectedSeats, currentUserId, onToggle,
                     userSelect: 'none',
                   }}
                 >
-                  {seat.col_number}
+                  {parseSeat(seat.nomor_kursi).colNumber === Number.MAX_SAFE_INTEGER ? '?' : parseSeat(seat.nomor_kursi).colNumber}
                 </Box>
               </Tooltip>
             ))}
@@ -111,10 +112,9 @@ export default function SeatMap({ seats, selectedSeats, currentUserId, onToggle,
       {/* Legend */}
       <Box sx={{ display: 'flex', gap: 2, mt: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
         {[
-          { color: SEAT_COLORS.available_regular, label: 'Regular' },
-          { color: SEAT_COLORS.available_vip, label: 'VIP' },
+          { color: SEAT_COLORS.available, label: 'Available' },
           { color: SEAT_COLORS.selected, label: 'Selected' },
-          { color: SEAT_COLORS.booked, label: 'Booked' },
+          { color: SEAT_COLORS.occupied, label: 'Occupied' },
           { color: SEAT_COLORS.locked, label: 'Locked' },
         ].map(({ color, label }) => (
           <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

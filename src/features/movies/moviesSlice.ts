@@ -2,18 +2,16 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import api from '../../services/api'
 
 export interface Movie {
-  id: string
-  title: string
-  description: string
-  poster_url: string
-  backdrop_url: string
-  genre: string
-  duration_min: number
-  rating: number
-  language: string
-  release_date: string
+  id_film: string
+  judul: string
+  deskripsi: string | null
+  poster_url: string | null
+  backdrop_url?: string
+  genre: string | null
+  durasi: number
+  avg_rating: number | string | null
+  release_date: string | null
   status: 'now_showing' | 'coming_soon' | 'ended'
-  created_at: string
 }
 
 interface MoviesState {
@@ -29,8 +27,8 @@ export const fetchMovies = createAsyncThunk(
   'movies/fetchAll',
   async (params: { status?: string; search?: string } | undefined, { rejectWithValue }) => {
     try {
-      const res = await api.get('/movies', { params })
-      return res.data.movies as Movie[]
+      const res = await api.get('/film', { params })
+      return res.data.films as Movie[]
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -39,27 +37,33 @@ export const fetchMovieById = createAsyncThunk(
   'movies/fetchById',
   async (id: string, { rejectWithValue }) => {
     try {
-      const res = await api.get(`/movies/${id}`)
-      return res.data.movie as Movie
+      const res = await api.get(`/film/${id}`)
+      return res.data.film as Movie
     } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
 
 export const createMovie = createAsyncThunk('movies/create', async (data: Partial<Movie>, { rejectWithValue }) => {
-  try { const res = await api.post('/movies', data); return res.data.movie as Movie }
+  try {
+    const res = await api.post('/film', data)
+    return res.data.film as Movie
+  }
   catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
 })
 
 export const updateMovie = createAsyncThunk(
   'movies/update',
   async ({ id, data }: { id: string; data: Partial<Movie> }, { rejectWithValue }) => {
-    try { const res = await api.put(`/movies/${id}`, data); return res.data.movie as Movie }
+    try {
+      const res = await api.put(`/film/${id}`, data)
+      return res.data.film as Movie
+    }
     catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
 
 export const deleteMovie = createAsyncThunk('movies/delete', async (id: string, { rejectWithValue }) => {
-  try { await api.delete(`/movies/${id}`); return id }
+  try { await api.delete(`/film/${id}`); return id }
   catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
 })
 
@@ -79,11 +83,11 @@ const moviesSlice = createSlice({
       .addCase(fetchMovieById.rejected, (s, a) => { s.loading = false; s.error = a.payload as string })
       .addCase(createMovie.fulfilled, (s, a) => { s.items.unshift(a.payload) })
       .addCase(updateMovie.fulfilled, (s, a) => {
-        const idx = s.items.findIndex(m => m.id === a.payload.id)
+        const idx = s.items.findIndex(m => m.id_film === a.payload.id_film)
         if (idx !== -1) s.items[idx] = a.payload
-        if (s.selected?.id === a.payload.id) s.selected = a.payload
+        if (s.selected?.id_film === a.payload.id_film) s.selected = a.payload
       })
-      .addCase(deleteMovie.fulfilled, (s, a) => { s.items = s.items.filter(m => m.id !== a.payload) })
+      .addCase(deleteMovie.fulfilled, (s, a) => { s.items = s.items.filter(m => m.id_film !== a.payload) })
   },
 })
 

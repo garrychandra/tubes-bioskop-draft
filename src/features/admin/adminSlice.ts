@@ -3,11 +3,11 @@ import api from '../../services/api'
 
 interface AdminStats {
   total_users: number
-  total_movies: number
+  total_films: number
   total_revenue: number
   today_revenue: number
   today_orders: number
-  orders: Record<string, number>
+  tiket: Record<string, number>
 }
 
 interface AdminState {
@@ -37,7 +37,7 @@ export const fetchIncome = createAsyncThunk(
 export const fetchAdminOrders = createAsyncThunk(
   'admin/fetchOrders',
   async (params: Record<string, unknown> | undefined, { rejectWithValue }) => {
-    try { const res = await api.get('/admin/orders', { params }); return res.data }
+    try { const res = await api.get('/admin/transactions', { params }); return res.data }
     catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }
   },
 )
@@ -65,10 +65,10 @@ const adminSlice = createSlice({
       .addCase(fetchAdminStats.fulfilled, (s, a) => { s.loading = false; s.stats = a.payload })
       .addCase(fetchAdminStats.rejected, (s, a) => { s.loading = false; s.error = a.payload as string })
       .addCase(fetchIncome.fulfilled, (s, a) => { s.income = a.payload })
-      .addCase(fetchAdminOrders.fulfilled, (s, a) => { s.orders = a.payload.orders || [] })
+      .addCase(fetchAdminOrders.fulfilled, (s, a) => { s.orders = a.payload.transactions || [] })
       .addCase(fetchAdminUsers.fulfilled, (s, a) => { s.users = a.payload })
       .addCase(updateUserRole.fulfilled, (s, a) => {
-        const idx = s.users.findIndex((u: any) => u.id === a.payload.id)
+        const idx = s.users.findIndex((u: any) => u.id_user === a.payload.id_user)
         if (idx !== -1) s.users[idx] = { ...s.users[idx], role: a.payload.role }
       })
   },

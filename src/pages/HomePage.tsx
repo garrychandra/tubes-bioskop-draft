@@ -100,7 +100,7 @@ export default function HomePage() {
         ) : (
           <Grid container spacing={3}>
             {nowShowing.map((movie) => (
-              <Grid item xs={6} sm={4} md={3} key={movie.id}>
+              <Grid item xs={6} sm={4} md={3} key={movie.id_film}>
                 <MovieCard movie={movie} />
               </Grid>
             ))}
@@ -115,20 +115,20 @@ export default function HomePage() {
             <Typography variant="h3" sx={{ mb: 4 }}>Upcoming Schedules</Typography>
             <Grid container spacing={2}>
               {schedules.slice(0, 3).map((s) => (
-                <Grid item xs={12} md={4} key={s.id}>
+                <Grid item xs={12} md={4} key={s.id_jadwal}>
                   <Paper
                     sx={{ p: 3, display: 'flex', gap: 2, alignItems: 'center', cursor: 'pointer',
                       '&:hover': { bgcolor: 'background.default' } }}
-                    onClick={() => navigate(`/schedules/${s.id}/seats`)}
+                    onClick={() => navigate(`/schedules/${s.id_jadwal}/seats`)}
                   >
-                    <Box component="img" src={s.poster_url} alt={s.movie_title}
+                    <Box component="img" src={s.poster_url || 'https://via.placeholder.com/60x90'} alt={s.judul || 'Movie Poster'}
                       sx={{ width: 60, height: 90, objectFit: 'cover', borderRadius: 1 }} />
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{s.movie_title}</Typography>
-                      <Typography variant="body2" color="text.secondary">{s.cinema_name}</Typography>
-                      <Typography variant="body2" color="text.secondary">{s.hall_name}</Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{s.judul}</Typography>
+                      <Typography variant="body2" color="text.secondary">{s.nama_bioskop}</Typography>
+                      <Typography variant="body2" color="text.secondary">{s.nama_studio}</Typography>
                       <Chip
-                        label={new Date(s.start_time).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                        label={new Date(s.jam_tayang).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
                         size="small" sx={{ mt: 0.5 }} color="primary" variant="outlined"
                       />
                     </Box>
