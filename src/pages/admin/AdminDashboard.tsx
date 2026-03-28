@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState(0)
   const [period, setPeriod] = useState('daily')
   const [halls, setHalls] = useState<any[]>([])
+  const [cinemas, setCinemas] = useState<any[]>([])
 
   // Movie form state
   const [movieDialog, setMovieDialog] = useState(false)
@@ -57,12 +58,23 @@ export default function AdminDashboard() {
   const [schedDialog, setSchedDialog] = useState(false)
   const [schedForm, setSchedForm] = useState<{ id_film: string; id_studio: string; jam_tayang: string; harga_tiket: number }>({ id_film: '', id_studio: '', jam_tayang: '', harga_tiket: 50000 })
 
+  // Cinema & Studio forms
+  const [cinemaDialog, setCinemaDialog] = useState(false)
+  const [cinemaForm, setCinemaForm] = useState({ nama_bioskop: '', lokasi: '', image_url: '' })
+  const [studioDialog, setStudioDialog] = useState(false)
+  const [studioForm, setStudioForm] = useState({ id_bioskop: '', nama_studio: '', kapasitas: 80 })
+
+  const fetchCinemas = () => {
+    api.get('/bioskop').then(res => setCinemas(res.data.bioskop || [])).catch(() => {})
+  }
+
   useEffect(() => {
     dispatch(fetchAdminStats())
     dispatch(fetchAdminOrders(undefined))
     dispatch(fetchAdminUsers())
     dispatch(fetchMovies({}))
     dispatch(fetchSchedules(undefined))
+    fetchCinemas()
     // Fetch halls for schedule creation
     api.get('/bioskop').then(async (res) => {
       const bioskop = res.data.bioskop || []
@@ -90,7 +102,27 @@ export default function AdminDashboard() {
     if (createSchedule.fulfilled.match(result)) { setSchedDialog(false) }
   }
 
-  const tabLabels = ['Overview', 'Movies', 'Schedules', 'Orders', 'Users']
+  const handleCreateCinema = async () => {
+    try {
+      await api.post('/bioskop', cinemaForm)
+      setCinemaDialog(false)
+      setCinemaForm({ nama_bioskop: '', lokasi: '', image_url: '' })
+      fetchCinemas()
+    } catch (err) {}
+  }
+
+  const handleCreateStudio = async () => {
+    try {
+      await api.post(`/bioskop/${studioForm.id_bioskop}/studios`, {
+        nama_studio: studioForm.nama_studio,
+        kapasitas: studioForm.kapasitas
+      })
+      setStudioDialog(false)
+      setStudioForm({ id_bioskop: '', nama_studio: '', kapasitas: 80 })
+    } catch (err) {}
+  }
+
+  const tabLabels = ['Overview', 'Movies', 'Schedules', 'Orders', 'Users', 'Cinemas']
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -364,17 +396,25 @@ export default function AdminDashboard() {
                     <Typography variant="caption" color="text.secondary">{u.email}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip label={u.role} size="small" color={u.role === 'Admin' ? 'primary' : 'default'} />
+                    <Chip label={u.role} size="small" color={u.role === 'Admin' ? 'primary' : u.role === 'Banned' ? 'error' : 'default'} />
                   </TableCell>
                   <TableCell>{u.total_transactions}</TableCell>
                   <TableCell>Rp{Number(u.total_spent).toLocaleString()}</TableCell>
                   <TableCell>-</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ display: 'flex', gap: 1 }}>
                     <Button
                       size="small" variant="outlined"
                       onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Admin' ? 'User' : 'Admin' }))}
+                      disabled={u.role === 'Banned'}
                     >
                       {u.role === 'Admin' ? 'Demote' : 'Make Admin'}
+                    </Button>
+                    <Button
+                      size="small" variant="contained" color={u.role === 'Banned' ? 'success' : 'error'}
+                      onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Banned' ? 'User' : 'Banned' }))}
+                      disabled={u.role === 'Admin'}
+                    >
+                      {u.role === 'Banned' ? 'Unban' : 'Ban'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -382,6 +422,78 @@ export default function AdminDashboard() {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {/* CINEMAS */}
+      {tab === 5 && (
+        <Box>
+           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2 }}>
+            <Button variant="contained" color="secondary" onClick={() => setStudioDialog(true)}>+ Add Studio</Button>
+            <Button variant="contained" onClick={() => setCinemaDialog(true)}>+ Add Cinema</Button>
+          </Box>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Image</TableCell>
+                  <TableCell>Cinema Name</TableCell>
+                  <TableCell>Location</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {cinemas.map((c: any) => (
+                  <TableRow key={c.id_bioskop}>
+                    <TableCell>
+                      {c.image_url ? (
+                        <Box component="img" src={c.image_url} sx={{ width: 80, height: 45, objectFit: 'cover', borderRadius: 1 }} />
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{c.nama_bioskop}</Typography></TableCell>
+                    <TableCell>{c.lokasi}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Add Cinema Dialog */}
+          <Dialog open={cinemaDialog} onClose={() => setCinemaDialog(false)}>
+            <DialogTitle>Add New Cinema</DialogTitle>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important', minWidth: 400 }}>
+              <TextField label="Cinema Name" required fullWidth
+                value={cinemaForm.nama_bioskop} onChange={e => setCinemaForm({...cinemaForm, nama_bioskop: e.target.value})} />
+              <TextField label="Location" required fullWidth multiline rows={2}
+                value={cinemaForm.lokasi} onChange={e => setCinemaForm({...cinemaForm, lokasi: e.target.value})} />
+              <TextField label="Image URL" fullWidth
+                value={cinemaForm.image_url} onChange={e => setCinemaForm({...cinemaForm, image_url: e.target.value})} />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setCinemaDialog(false)}>Cancel</Button>
+              <Button variant="contained" onClick={handleCreateCinema}>Create Cinema</Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Add Studio Dialog */}
+          <Dialog open={studioDialog} onClose={() => setStudioDialog(false)}>
+            <DialogTitle>Add Studio to Cinema</DialogTitle>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important', minWidth: 400 }}>
+              <FormControl fullWidth required>
+                <InputLabel>Target Cinema</InputLabel>
+                <Select value={studioForm.id_bioskop} label="Target Cinema" onChange={e => setStudioForm({...studioForm, id_bioskop: e.target.value})}>
+                  {cinemas.map((c: any) => <MenuItem key={c.id_bioskop} value={c.id_bioskop}>{c.nama_bioskop}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Studio Name (e.g. Studio 1)" required fullWidth
+                value={studioForm.nama_studio} onChange={e => setStudioForm({...studioForm, nama_studio: e.target.value})} />
+              <TextField label="Capacity (Seats)" type="number" required fullWidth
+                value={studioForm.kapasitas} onChange={e => setStudioForm({...studioForm, kapasitas: Number(e.target.value)})} />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setStudioDialog(false)}>Cancel</Button>
+              <Button variant="contained" onClick={handleCreateStudio} disabled={!studioForm.id_bioskop}>Create Studio</Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
       )}
     </Container>
   )

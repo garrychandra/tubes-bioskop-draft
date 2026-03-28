@@ -14,6 +14,7 @@ interface AuthState {
   token: string | null
   loading: boolean
   error: string | null
+  fraudWarning: string | null
 }
 
 const storedUser = localStorage.getItem('cinema_user')
@@ -24,6 +25,7 @@ const initialState: AuthState = {
   token: storedToken,
   loading: false,
   error: null,
+  fraudWarning: null,
 }
 
 export const login = createAsyncThunk(
@@ -67,9 +69,12 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null
     },
+    clearFraudWarning(state) {
+      state.fraudWarning = null
+    },
   },
   extraReducers: (builder) => {
-    const success = (state: AuthState, action: PayloadAction<{ user: User; token: string }>) => {
+    const defaultSuccess = (state: AuthState, action: PayloadAction<{ user: User; token: string }>) => {
       state.loading = false
       state.user = action.payload.user
       state.token = action.payload.token
@@ -77,15 +82,20 @@ const authSlice = createSlice({
       localStorage.setItem('cinema_token', action.payload.token)
       localStorage.setItem('cinema_user', JSON.stringify(action.payload.user))
     }
+    const loginSuccess = (state: AuthState, action: PayloadAction<{ user: User; token: string, fraudWarning?: string }>) => {
+      defaultSuccess(state, action)
+      state.fraudWarning = action.payload.fraudWarning || null
+    }
+
     const pending = (state: AuthState) => { state.loading = true; state.error = null }
     const failed = (state: AuthState, action: PayloadAction<any>) => {
       state.loading = false; state.error = action.payload
     }
     builder
-      .addCase(login.pending, pending).addCase(login.fulfilled, success).addCase(login.rejected, failed)
-      .addCase(register.pending, pending).addCase(register.fulfilled, success).addCase(register.rejected, failed)
+      .addCase(login.pending, pending).addCase(login.fulfilled, loginSuccess).addCase(login.rejected, failed)
+      .addCase(register.pending, pending).addCase(register.fulfilled, defaultSuccess).addCase(register.rejected, failed)
   },
 })
 
-export const { logout, clearError } = authSlice.actions
+export const { logout, clearError, clearFraudWarning } = authSlice.actions
 export default authSlice.reducer

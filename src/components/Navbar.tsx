@@ -57,6 +57,7 @@ export default function Navbar() {
                   <Typography variant="body2" color="text.secondary">{user.email}</Typography>
                 </MenuItem>
                 <Divider />
+                <MenuItem onClick={() => { navigate('/profile'); setAnchorEl(null) }}>My Profile</MenuItem>
                 <MenuItem onClick={() => { navigate('/tickets'); setAnchorEl(null) }}>My Tickets</MenuItem>
                 {user.role === 'Admin' && (
                   <MenuItem onClick={() => { navigate('/admin'); setAnchorEl(null) }}>Admin Panel</MenuItem>

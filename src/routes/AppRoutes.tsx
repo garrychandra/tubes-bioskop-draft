@@ -11,6 +11,7 @@ import LoginPage from '../pages/LoginPage'
 import RegisterPage from '../pages/RegisterPage'
 import AdminDashboard from '../pages/admin/AdminDashboard'
 import VerifyPage from '../pages/VerifyPage'
+import ProfilePage from '../pages/ProfilePage'
 import ProtectedRoute from '../components/ProtectedRoute'
 
 const AppRoutes = () => (
@@ -25,6 +26,7 @@ const AppRoutes = () => (
     <Route path="/verify" element={<VerifyPage />} />
     <Route path="/schedules/:id/seats" element={<ProtectedRoute><SeatSelectionPage /></ProtectedRoute>} />
     <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
+    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
     <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
     <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/" replace />} />

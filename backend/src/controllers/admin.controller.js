@@ -94,7 +94,7 @@ const getUsers = async (req, res) => {
 
 const updateUserRole = async (req, res) => {
   const { role } = req.body;
-  if (!['User', 'Admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  if (!['User', 'Admin', 'Banned'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
