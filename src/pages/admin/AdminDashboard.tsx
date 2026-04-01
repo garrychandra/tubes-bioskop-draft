@@ -401,21 +401,23 @@ export default function AdminDashboard() {
                   <TableCell>{u.total_transactions}</TableCell>
                   <TableCell>Rp{Number(u.total_spent).toLocaleString()}</TableCell>
                   <TableCell>-</TableCell>
-                  <TableCell sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small" variant="outlined"
-                      onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Admin' ? 'User' : 'Admin' }))}
-                      disabled={u.role === 'Banned'}
-                    >
-                      {u.role === 'Admin' ? 'Demote' : 'Make Admin'}
-                    </Button>
-                    <Button
-                      size="small" variant="contained" color={u.role === 'Banned' ? 'success' : 'error'}
-                      onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Banned' ? 'User' : 'Banned' }))}
-                      disabled={u.role === 'Admin'}
-                    >
-                      {u.role === 'Banned' ? 'Unban' : 'Ban'}
-                    </Button>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small" variant="outlined"
+                        onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Admin' ? 'User' : 'Admin' }))}
+                        disabled={u.role === 'Banned'}
+                      >
+                        {u.role === 'Admin' ? 'Demote' : 'Make Admin'}
+                      </Button>
+                      <Button
+                        size="small" variant="contained" color={u.role === 'Banned' ? 'success' : 'error'}
+                        onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Banned' ? 'User' : 'Banned' }))}
+                        disabled={u.role === 'Admin'}
+                      >
+                        {u.role === 'Banned' ? 'Unban' : 'Ban'}
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

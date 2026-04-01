@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import {
   Container, Typography, Paper, TextField, Button,
-  Box, CircularProgress, Chip, Divider,
+  Box, CircularProgress, Chip, Divider, Alert
 } from '@mui/material'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CancelIcon from '@mui/icons-material/Cancel'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { verifyTicket, clearVerify } from '../features/tickets/ticketsSlice'
+import { verifyTicket, clearVerify, markTicketUsed } from '../features/tickets/ticketsSlice'
 import { QRCodeSVG } from 'qrcode.react'
 
 export default function VerifyPage() {
   const dispatch = useAppDispatch()
-  const { verifyResult, loading } = useAppSelector((s) => s.tickets)
+  const { verifyResult, loading, error } = useAppSelector((s) => s.tickets)
   const [barcode, setBarcode] = useState('')
 
   const handleVerify = () => {
@@ -23,6 +23,15 @@ export default function VerifyPage() {
     setBarcode('')
   }
 
+  const handleRedeem = async () => {
+    if (verifyResult?.ticket) {
+      const res = await dispatch(markTicketUsed(verifyResult.ticket.barcode))
+      if (markTicketUsed.fulfilled.match(res)) {
+         setTimeout(() => handleReset(), 2000)
+      }
+    }
+  }
+
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
       <Typography variant="h3" sx={{ fontWeight: 800, mb: 1 }}>Verify Ticket</Typography>
@@ -31,6 +40,7 @@ export default function VerifyPage() {
       </Typography>
 
       <Paper sx={{ p: 4 }}>
+        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
         <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
           <TextField
             fullWidth label="Ticket Barcode" value={barcode}
@@ -75,7 +85,7 @@ export default function VerifyPage() {
                   <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     <Typography variant="body2" sx={{ fontWeight: label === 'Status' ? 700 : 400 }}>
-                      {label === 'Status' ? <Chip label={String(value).toUpperCase()} size="small" color={value === 'active' ? 'success' : 'default'} /> : value}
+                      {label === 'Status' ? <Chip label={value === 'used' ? 'REDEEMED' : String(value).toUpperCase()} size="small" color={value === 'active' ? 'success' : 'default'} /> : value}
                     </Typography>
                   </Box>
                 ))}
@@ -88,7 +98,13 @@ export default function VerifyPage() {
               </>
             )}
 
-            <Button fullWidth variant="outlined" sx={{ mt: 3 }} onClick={handleReset}>
+            {verifyResult.ticket && verifyResult.ticket.status_tiket === 'active' && (
+              <Button fullWidth variant="contained" color="success" sx={{ mt: 3 }} onClick={handleRedeem} disabled={loading}>
+                {loading ? <CircularProgress size={22} color="inherit" /> : 'Mark as Redeemed'}
+              </Button>
+            )}
+
+            <Button fullWidth variant="outlined" sx={{ mt: verifyResult.ticket?.status_tiket === 'active' ? 1.5 : 3 }} onClick={handleReset}>
               Verify Another
             </Button>
           </Box>

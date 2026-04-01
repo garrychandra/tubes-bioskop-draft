@@ -23,7 +23,7 @@ export default function CheckoutSuccessPage() {
     )
   }
 
-  const { transaksi, tiket, qr_code } = lastPurchase
+  const { transaksi, tiket } = lastPurchase
 
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
@@ -34,16 +34,19 @@ export default function CheckoutSuccessPage() {
           Your tickets have been booked. Show the QR code at the entrance.
         </Typography>
 
-        {/* QR Code */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2 }}>
-            <QRCodeSVG value={tiket[0]?.barcode || ''} size={200} />
-          </Box>
+        {/* QR Codes */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          {tiket.map((t: any) => (
+            <Box key={t.id_tiket || t.barcode} sx={{ textAlign: 'center' }}>
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, display: 'inline-block' }}>
+                <QRCodeSVG value={t.barcode} size={200} />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontFamily: 'monospace' }}>
+                {t.barcode} (Seat {t.nomor_kursi || t.id_kursi})
+              </Typography>
+            </Box>
+          ))}
         </Box>
-
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3, fontFamily: 'monospace' }}>
-          {tiket[0]?.barcode || qr_code}
-        </Typography>
 
         <Divider sx={{ mb: 3 }} />
 

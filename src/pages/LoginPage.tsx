@@ -98,16 +98,14 @@ export default function LoginPage() {
           </Button>
         </Box>
 
-        <Box sx={{ textAlign: 'center', mt: 3 }}>
+        <Box sx={{ textAlign: 'center', mt: 3, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             Don't have an account?{' '}
             <Link component={RouterLink} to={`/register?redirect=${encodeURIComponent(redirectTo)}`} color="primary">Register</Link>
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            <Link component="button" variant="body2" onClick={() => setForgotPasswordOpen(true)}>
-              Forgot Password?
-            </Link>
-          </Typography>
+          <Button variant="text" onClick={() => setForgotPasswordOpen(true)} size="small" sx={{ fontWeight: 600 }}>
+            Forgot Password?
+          </Button>
         </Box>
 
         {/* Demo credentials */}

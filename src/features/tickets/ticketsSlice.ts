@@ -123,6 +123,16 @@ export const getTicketBarcode = createAsyncThunk(
   },
 )
 
+export const markTicketUsed = createAsyncThunk(
+  'tickets/markUsed',
+  async (barcode: string, { rejectWithValue }) => {
+    try {
+      const res = await api.post(`/tiket/use/${barcode}`)
+      return res.data
+    } catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed to mark used') }
+  },
+)
+
 const ticketsSlice = createSlice({
   name: 'tickets',
   initialState,
@@ -142,6 +152,15 @@ const ticketsSlice = createSlice({
       .addCase(verifyTicket.pending, (s) => { s.loading = true; s.verifyResult = null })
       .addCase(verifyTicket.fulfilled, (s, a) => { s.loading = false; s.verifyResult = a.payload })
       .addCase(verifyTicket.rejected, (s, a) => { s.loading = false; s.verifyResult = { valid: false }; s.error = a.payload as string })
+      .addCase(markTicketUsed.pending, (s) => { s.loading = true; s.error = null })
+      .addCase(markTicketUsed.fulfilled, (s) => { 
+        s.loading = false; 
+        if (s.verifyResult?.ticket) {
+          s.verifyResult.ticket.status_tiket = 'used'
+          s.verifyResult.valid = false // no longer valid for another entry
+        }
+      })
+      .addCase(markTicketUsed.rejected, (s, a) => { s.loading = false; s.error = a.payload as string })
   },
 })
 

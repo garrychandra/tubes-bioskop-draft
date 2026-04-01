@@ -178,6 +178,11 @@ const markUsed = async (req, res) => {
     );
     if (!count) return res.status(404).json({ error: 'Ticket not found or already used' });
     const tiket = await Tiket.findOne({ where: { barcode } });
+    
+    if (tiket) {
+      await Transaksi.update({ status: 'used' }, { where: { id_transaksi: tiket.id_transaksi, status: 'paid' } });
+    }
+
     res.json({ message: 'Ticket marked as used', tiket });
   } catch (err) { res.status(500).json({ error: 'Failed' }); }
 };

@@ -35,7 +35,11 @@ const runFraudScanner = async () => {
     const ticketIds = pastDueTickets.map(t => t.id_tiket);
     await Tiket.update({ status_tiket: 'fraud' }, { where: { id_tiket: ticketIds } });
 
-    console.log(`[Fraud Scanner] Marked ${ticketIds.length} tickets as fraud.`);
+    // Step 1.5: Update parent orders to 'fraud' if they haven't been redeemed
+    const transactionIds = [...new Set(pastDueTickets.map(t => t.id_transaksi))];
+    await Transaksi.update({ status: 'fraud' }, { where: { id_transaksi: transactionIds, status: 'paid' } });
+
+    console.log(`[Fraud Scanner] Marked ${ticketIds.length} tickets and ${transactionIds.length} orders as fraud.`);
 
     // Step 2: Check monthly limits for affected users
     const startOfMonth = new Date();

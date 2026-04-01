@@ -11,7 +11,7 @@ import { QRCodeSVG } from 'qrcode.react'
 export default function TicketsPage() {
   const dispatch = useAppDispatch()
   const { myTickets, loading } = useAppSelector((s) => s.tickets)
-  const [qrOpen, setQrOpen] = useState<string | null>(null)
+  const [qrOpen, setQrOpen] = useState<any[] | null>(null)
 
   useEffect(() => {
     dispatch(fetchMyTickets())
@@ -81,7 +81,7 @@ export default function TicketsPage() {
                   {ticket.status === 'paid' && ticket.tiket && ticket.tiket.length > 0 && (
                     <Button
                       variant="outlined" startIcon={<QrCodeIcon />} size="small"
-                      onClick={() => setQrOpen(ticket.tiket![0].barcode)}
+                      onClick={() => setQrOpen(ticket.tiket!)}
                     >
                       Show QR
                     </Button>
@@ -97,17 +97,19 @@ export default function TicketsPage() {
       {/* QR Code Dialog */}
       <Dialog open={Boolean(qrOpen)} onClose={() => setQrOpen(null)}>
         <DialogContent sx={{ textAlign: 'center', p: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Ticket QR Code</Typography>
-          {qrOpen && (
-            <>
-              <Box sx={{ p: 2, bgcolor: 'white', display: 'inline-block', borderRadius: 1 }}>
-                <QRCodeSVG value={qrOpen} size={220} />
+          <Typography variant="h6" sx={{ mb: 2 }}>Ticket QR Codes</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '60vh', overflowY: 'auto' }}>
+            {qrOpen && qrOpen.map((t) => (
+              <Box key={t.id_tiket}>
+                <Box sx={{ p: 2, bgcolor: 'white', display: 'inline-block', borderRadius: 1 }}>
+                  <QRCodeSVG value={t.barcode} size={220} />
+                </Box>
+                <Typography variant="caption" sx={{ display: 'block', mt: 1, fontFamily: 'monospace', color: 'text.secondary' }}>
+                  {t.barcode} (Seat {t.nomor_kursi})
+                </Typography>
               </Box>
-              <Typography variant="caption" sx={{ display: 'block', mt: 2, fontFamily: 'monospace', color: 'text.secondary' }}>
-                {qrOpen}
-              </Typography>
-            </>
-          )}
+            ))}
+          </Box>
           <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={() => setQrOpen(null)}>Close</Button>
         </DialogContent>
       </Dialog>
