@@ -25,6 +25,11 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: 'User',
   },
+  pending_discount: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
 }, {
   tableName: 'users',
   timestamps: false,

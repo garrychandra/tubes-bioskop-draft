@@ -4,7 +4,7 @@
 #     -n cinema -f k8s/postgres-values.yaml
 
 postgresql:
-  replicaCount: 2          # 1 primary + 1 read replica
+  replicaCount: 3          # 1 primary + 2 read replicas (distributed across 3 nodes)
   username: cinema_user
   database: cinema_db
   # Passwords are read from the existing K8s Secret "cinema-pg-passwords".
@@ -27,7 +27,7 @@ postgresql:
       cpu: "500m"
 
 pgpool:
-  replicaCount: 1
+  replicaCount: 3          # One PgPool instance per node for redundancy
   podAntiAffinityPreset: soft
   resources:
     requests:

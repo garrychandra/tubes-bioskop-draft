@@ -18,6 +18,7 @@ import { fetchAdminStats, fetchIncome, fetchAdminOrders, fetchAdminUsers, update
 import { fetchMovies, createMovie, deleteMovie } from '../../features/movies/moviesSlice'
 import { fetchSchedules, createSchedule, deleteSchedule } from '../../features/schedules/schedulesSlice'
 import api from '../../services/api'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 
 interface StatCardProps {
   title: string
@@ -49,6 +50,7 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState('daily')
   const [halls, setHalls] = useState<any[]>([])
   const [cinemas, setCinemas] = useState<any[]>([])
+  const [noShowData, setNoShowData] = useState<any[]>([])
 
   // Movie form state
   const [movieDialog, setMovieDialog] = useState(false)
@@ -75,6 +77,9 @@ export default function AdminDashboard() {
     dispatch(fetchMovies({}))
     dispatch(fetchSchedules(undefined))
     fetchCinemas()
+    api.get('/admin/noshows', { params: { days: 14 } })
+      .then(res => setNoShowData(res.data.noshows || []))
+      .catch(() => {})
     // Fetch halls for schedule creation
     api.get('/bioskop').then(async (res) => {
       const bioskop = res.data.bioskop || []
@@ -164,6 +169,15 @@ export default function AdminDashboard() {
               <StatCard title="Movies" icon={<MovieIcon sx={{ color: 'white' }} />}
                 value={stats?.total_films || 0} color="#7b1fa2" />
             </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <StatCard
+                title="No-Shows Today"
+                icon={<WarningAmberIcon sx={{ color: 'white' }} />}
+                value={stats?.today_noshows || 0}
+                color="#f57c00"
+                sub={`${stats?.tiket?.fraud || 0} total no-shows`}
+              />
+            </Grid>
           </Grid>
 
           {/* Revenue Chart */}
@@ -203,6 +217,27 @@ export default function AdminDashboard() {
                 <YAxis stroke="#888" tick={{ fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#141414', border: '1px solid #333' }} labelStyle={{ color: '#fff' }} />
                 <Bar dataKey="transactions" fill="#f5c518" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+
+          {/* No-Show Trend Chart */}
+          <Paper sx={{ p: 3, mt: 3, border: '1px solid #f57c0044' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <WarningAmberIcon sx={{ color: '#f57c00' }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Daily No-Shows (Last 14 Days)</Typography>
+            </Box>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={noShowData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11 }} />
+                <YAxis stroke="#888" tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ background: '#141414', border: '1px solid #f57c00' }}
+                  labelStyle={{ color: '#fff' }}
+                  formatter={(v: any) => [v, 'No-Shows']}
+                />
+                <Bar dataKey="noshows" fill="#f57c00" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           </Paper>

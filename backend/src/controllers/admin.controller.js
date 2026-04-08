@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 const getStats = async (req, res) => {
   try {
-    const [totalUsers, totalFilms, revenueResult, todayResult, tiketRows] = await Promise.all([
+    const [totalUsers, totalFilms, revenueResult, todayResult, tiketRows, noShowToday] = await Promise.all([
       User.count({ where: { role: 'User' } }),
       Film.count(),
       Transaksi.sum('total_bayar', { where: { status: 'paid' } }),
@@ -14,6 +14,13 @@ const getStats = async (req, res) => {
       `, { type: QueryTypes.SELECT }),
       sequelize.query(`
         SELECT status_tiket, COUNT(*) as count FROM tiket GROUP BY status_tiket
+      `, { type: QueryTypes.SELECT }),
+      sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM tiket t
+        JOIN jadwal j ON t.id_jadwal = j.id_jadwal
+        WHERE t.status_tiket = 'fraud'
+          AND DATE(j.jam_tayang) = CURRENT_DATE
       `, { type: QueryTypes.SELECT }),
     ]);
 
@@ -26,6 +33,7 @@ const getStats = async (req, res) => {
       total_revenue: parseFloat(revenueResult || 0),
       today_revenue: parseFloat(todayResult[0]?.today_revenue || 0),
       today_orders: parseInt(todayResult[0]?.today_orders || 0),
+      today_noshows: parseInt(noShowToday[0]?.count || 0),
       tiket: tiketStats,
     });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Failed' }); }
@@ -103,5 +111,22 @@ const updateUserRole = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Failed' }); }
 };
 
-module.exports = { getStats, getIncome, getTransactions, getUsers, updateUserRole };
+const getNoShowTrend = async (req, res) => {
+  try {
+    const { days = 14 } = req.query;
+    const rows = await sequelize.query(`
+      SELECT TO_CHAR(DATE_TRUNC('day', j.jam_tayang), 'YYYY-MM-DD') as date,
+             COUNT(t.id_tiket) as noshows
+      FROM tiket t
+      JOIN jadwal j ON t.id_jadwal = j.id_jadwal
+      WHERE t.status_tiket = 'fraud'
+        AND j.jam_tayang >= NOW() - INTERVAL '1 day' * $1
+      GROUP BY DATE_TRUNC('day', j.jam_tayang)
+      ORDER BY DATE_TRUNC('day', j.jam_tayang) ASC
+    `, { bind: [parseInt(days) || 14], type: QueryTypes.SELECT });
+    res.json({ noshows: rows });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Failed' }); }
+};
+
+module.exports = { getStats, getIncome, getTransactions, getUsers, updateUserRole, getNoShowTrend };
 

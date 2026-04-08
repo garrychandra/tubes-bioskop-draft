@@ -25,6 +25,11 @@ const Transaksi = sequelize.define('Transaksi', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  discount_applied: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
 }, {
   tableName: 'transaksi',
   timestamps: false,

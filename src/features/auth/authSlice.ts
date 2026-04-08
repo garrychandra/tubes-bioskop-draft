@@ -6,7 +6,7 @@ export interface User {
   nama: string
   email: string
   role: 'User' | 'Admin'
-  created_at: string
+  pending_discount?: boolean
 }
 
 interface AuthState {
@@ -14,7 +14,7 @@ interface AuthState {
   token: string | null
   loading: boolean
   error: string | null
-  fraudWarning: string | null
+  noShowNotification: string | null
 }
 
 const storedUser = localStorage.getItem('cinema_user')
@@ -25,7 +25,7 @@ const initialState: AuthState = {
   token: storedToken,
   loading: false,
   error: null,
-  fraudWarning: null,
+  noShowNotification: null,
 }
 
 export const login = createAsyncThunk(
@@ -69,8 +69,12 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null
     },
+    clearNoShowNotification(state) {
+      state.noShowNotification = null
+    },
+    // Keep backward compat alias
     clearFraudWarning(state) {
-      state.fraudWarning = null
+      state.noShowNotification = null
     },
   },
   extraReducers: (builder) => {
@@ -82,9 +86,9 @@ const authSlice = createSlice({
       localStorage.setItem('cinema_token', action.payload.token)
       localStorage.setItem('cinema_user', JSON.stringify(action.payload.user))
     }
-    const loginSuccess = (state: AuthState, action: PayloadAction<{ user: User; token: string, fraudWarning?: string }>) => {
+    const loginSuccess = (state: AuthState, action: PayloadAction<{ user: User; token: string; noShowNotification?: string }>) => {
       defaultSuccess(state, action)
-      state.fraudWarning = action.payload.fraudWarning || null
+      state.noShowNotification = action.payload.noShowNotification || null
     }
 
     const pending = (state: AuthState) => { state.loading = true; state.error = null }
@@ -97,5 +101,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError, clearFraudWarning } = authSlice.actions
+export const { logout, clearError, clearNoShowNotification, clearFraudWarning } = authSlice.actions
 export default authSlice.reducer

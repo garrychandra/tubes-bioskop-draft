@@ -7,6 +7,7 @@ interface AdminStats {
   total_revenue: number
   today_revenue: number
   today_orders: number
+  today_noshows: number
   tiket: Record<string, number>
 }
 

@@ -10,5 +10,6 @@ router.get('/income', ctrl.getIncome);
 router.get('/transactions', ctrl.getTransactions);
 router.get('/users', ctrl.getUsers);
 router.put('/users/:id/role', ctrl.updateUserRole);
+router.get('/noshows', ctrl.getNoShowTrend);
 
 module.exports = router;

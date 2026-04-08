@@ -1,7 +1,25 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const { User } = require('../models');
 
+// ─── In-memory OTP store ────────────────────────────────────────────────────
+// Structure: { email => { otp, expiresAt } }
+const otpStore = new Map();
+
+const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+// ─── Nodemailer transporter ──────────────────────────────────────────────────
+const createTransporter = () =>
+  nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+// ─── Register ────────────────────────────────────────────────────────────────
 const register = async (req, res) => {
   const { nama, email, password } = req.body;
   if (!nama || !email || !password)
@@ -21,38 +39,27 @@ const register = async (req, res) => {
   }
 };
 
+// ─── Login ───────────────────────────────────────────────────────────────────
 const login = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    if (user.role === 'Banned') return res.status(403).json({ error: 'Your account has been banned due to policy violations.' });
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
     const token = jwt.sign({ id: user.id_user }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
-    // Check for fraud warning
-    const { Op } = require('sequelize');
-    const { Tiket, Transaksi, Jadwal } = require('../models');
-    
-    // Check frauds for this current month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0,0,0,0);
-    
-    const fraudCount = await Tiket.count({
-      where: { status_tiket: 'fraud' },
-      include: [
-        { model: Transaksi, where: { id_user: user.id_user }, required: true },
-        { model: Jadwal, where: { jam_tayang: { [Op.gte]: startOfMonth } }, required: true }
-      ]
-    });
+    const response = {
+      user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role },
+      token,
+    };
 
-    const response = { user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role }, token };
-    if (fraudCount === 3) {
-      response.fraudWarning = "You currently have 3 unused (fraud) tickets this month. One more will result in an account ban.";
+    // No-show discount notification
+    if (user.pending_discount) {
+      response.noShowNotification = "You had a no-show on a previous visit. A 50% discount has been applied to your next ticket purchase!";
     }
 
     res.json(response);
@@ -62,10 +69,21 @@ const login = async (req, res) => {
   }
 };
 
+// ─── Get Me ──────────────────────────────────────────────────────────────────
 const getMe = async (req, res) => {
-  res.json({ user: req.user });
+  const user = await User.findByPk(req.user.id_user);
+  res.json({
+    user: {
+      id_user: user.id_user,
+      nama: user.nama,
+      email: user.email,
+      role: user.role,
+      pending_discount: user.pending_discount,
+    }
+  });
 };
 
+// ─── Change Password (authenticated) ─────────────────────────────────────────
 const changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -80,7 +98,7 @@ const changePassword = async (req, res) => {
 
     user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
-    
+
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
     console.error(err);
@@ -88,24 +106,100 @@ const changePassword = async (req, res) => {
   }
 };
 
-const resetPassword = async (req, res) => {
-  try {
-    // For demo purposes, we allow resetting password just by knowing the email.
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword are required' });
-    if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+// ─── Forgot Password — Step 1: Send OTP via Gmail ────────────────────────────
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email is required' });
 
+  try {
     const user = await User.findOne({ where: { email } });
+    // Always return success to avoid email enumeration
+    if (!user) return res.json({ message: 'If an account with that email exists, a code has been sent.' });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(email, { otp, expiresAt: Date.now() + OTP_EXPIRY_MS });
+
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: `"CineMax Cinema" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your CineMax Password Reset Code',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; color: #fff; border-radius: 12px; overflow: hidden;">
+          <div style="background: #e50914; padding: 24px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px; letter-spacing: 2px;">🎬 CineMax</h1>
+          </div>
+          <div style="padding: 32px;">
+            <h2 style="color: #fff; margin-top: 0;">Password Reset Code</h2>
+            <p style="color: #aaa;">Hi ${user.nama}, use the code below to reset your password. It expires in 10 minutes.</p>
+            <div style="background: #1a1a1a; border: 2px solid #e50914; border-radius: 8px; padding: 24px; text-align: center; margin: 24px 0;">
+              <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #e50914;">${otp}</span>
+            </div>
+            <p style="color: #666; font-size: 13px;">If you didn't request this, you can safely ignore this email.</p>
+          </div>
+        </div>
+      `,
+    });
+
+    res.json({ message: 'If an account with that email exists, a code has been sent.' });
+  } catch (err) {
+    console.error('[Forgot Password]', err);
+    res.status(500).json({ error: 'Failed to send reset email. Please try again.' });
+  }
+};
+
+// ─── Forgot Password — Step 2: Verify OTP ────────────────────────────────────
+const verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ error: 'email and otp are required' });
+
+  const record = otpStore.get(email);
+  if (!record) return res.status(400).json({ error: 'No OTP requested for this email.' });
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(email);
+    return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+  }
+  if (record.otp !== otp.toString()) {
+    return res.status(400).json({ error: 'Incorrect OTP code.' });
+  }
+
+  // OTP valid — clear it and issue a short-lived reset token
+  otpStore.delete(email);
+  const resetToken = jwt.sign({ email, purpose: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '10m' });
+
+  res.json({ message: 'OTP verified.', reset_token: resetToken });
+};
+
+// ─── Forgot Password — Step 3: Reset Password with token ─────────────────────
+const resetPassword = async (req, res) => {
+  const { reset_token, newPassword } = req.body;
+  if (!reset_token || !newPassword) return res.status(400).json({ error: 'reset_token and newPassword are required' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  try {
+    let payload;
+    try {
+      payload = jwt.verify(reset_token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(400).json({ error: 'Reset token is invalid or expired. Please start over.' });
+    }
+
+    if (payload.purpose !== 'password_reset') {
+      return res.status(400).json({ error: 'Invalid token purpose.' });
+    }
+
+    const user = await User.findOne({ where: { email: payload.email } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
 
-    res.json({ message: 'Password reset successfully' });
+    res.json({ message: 'Password reset successfully. You can now log in.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to reset password' });
   }
 };
 
-module.exports = { register, login, getMe, changePassword, resetPassword };
+module.exports = { register, login, getMe, changePassword, forgotPassword, verifyOtp, resetPassword };

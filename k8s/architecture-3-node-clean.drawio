@@ -1,0 +1,275 @@
+<mxfile host="app.diagrams.net" modified="2026-04-01T00:00:00.000Z" agent="GPT-5.3-Codex" version="24.7.17" type="device">
+  <diagram id="k8s-3-node-clean" name="K8s 3-Node Architecture (Balanced)">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="950" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- EXTERNAL -->
+        <mxCell id="2" value="Internet Users" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="300" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- KUBERNETES CLUSTER -->
+        <mxCell id="3" value="Kubernetes Cluster" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#333333;strokeWidth=3;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="170" y="20" width="1410" height="920" as="geometry" />
+        </mxCell>
+
+        <!-- NAMESPACE -->
+        <mxCell id="4" value="Namespace: cinema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#999999;dashed=1;strokeWidth=2;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="190" y="50" width="1370" height="870" as="geometry" />
+        </mxCell>
+
+        <!-- INGRESS LAYER -->
+        <mxCell id="5" value="Ingress Controller (nginx)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="70" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="6" value="Ingress Rule&#xa;cinema.example.com" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="430" y="75" width="160" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- SERVICES LAYER -->
+        <mxCell id="7" value="Service: frontend:80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="75" width="130" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="8" value="Service: backend:5000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="75" width="130" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="9" value="Service: pgpool:5432" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="970" y="75" width="130" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- CONFIG/SECRETS -->
+        <mxCell id="40" value="ConfigMap&#xa;cinema-config" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="75" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="41" value="Secret&#xa;cinema-secrets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="75" width="110" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- NODE 1 -->
+        <mxCell id="10" value="Node 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=2;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="190" y="150" width="330" height="710" as="geometry" />
+        </mxCell>
+
+        <mxCell id="11" value="Frontend Pod A&#xa;:80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5e0;strokeColor=#558b2f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="12" value="Backend Pod A&#xa;:5000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="13" value="PostgreSQL-0&#xa;Primary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#880e4f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="14" value="PgPool-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pvc1" value="PVC&#xa;5Gi" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=15;fillColor=#f3e5f5;strokeColor=#512da8;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="210" y="430" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- NODE 2 -->
+        <mxCell id="20" value="Node 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=2;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="540" y="150" width="330" height="710" as="geometry" />
+        </mxCell>
+
+        <mxCell id="21" value="Frontend Pod B&#xa;:80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5e0;strokeColor=#558b2f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="22" value="Backend Pod B&#xa;:5000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="710" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="23" value="PostgreSQL-1&#xa;Replica" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#880e4f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="24" value="PgPool-2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="710" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pvc2" value="PVC&#xa;5Gi" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=15;fillColor=#f3e5f5;strokeColor=#512da8;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="560" y="430" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- NODE 3 -->
+        <mxCell id="30" value="Node 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=2;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="890" y="150" width="330" height="710" as="geometry" />
+        </mxCell>
+
+        <mxCell id="31" value="Frontend Pod C&#xa;:80" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5e0;strokeColor=#558b2f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="910" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="32" value="Backend Pod C&#xa;:5000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="180" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="33" value="PostgreSQL-2&#xa;Replica" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#880e4f;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="910" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="34" value="PgPool-3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="300" width="130" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pvc3" value="PVC&#xa;5Gi" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=15;fillColor=#f3e5f5;strokeColor=#512da8;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="910" y="430" width="100" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="35" value="Migration Job&#xa;(one-time)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#558b2f;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="910" y="540" width="130" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- LEGEND/NOTES -->
+        <mxCell id="notes" value="✓ 3x Frontend, 3x Backend, 3x PostgreSQL, 3x PgPool (no SPOF)&#xa;✓ Anti-affinity enforced: max 1 replica per node" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#999999;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="190" y="820" width="1030" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- CONNECTIONS: CLIENT TO INGRESS -->
+        <mxCell id="e1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#333;" edge="1" parent="1" source="2" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- INGRESS FLOW -->
+        <mxCell id="e2" style="endArrow=classic;html=1;strokeWidth=1.5;strokeColor=#333;" edge="1" parent="1" source="5" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="/ (frontend)" style="endArrow=classic;html=1;strokeWidth=1.5;strokeColor=#82b366;" edge="1" parent="1" source="6" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" value="/api (backend)" style="endArrow=classic;html=1;strokeWidth=1.5;strokeColor=#1565c0;" edge="1" parent="1" source="6" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SERVICES TO PODS: FRONTEND -->
+        <mxCell id="e5" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#82b366;" edge="1" parent="1" source="7" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#82b366;" edge="1" parent="1" source="7" target="21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#82b366;" edge="1" parent="1" source="7" target="31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- SERVICES TO PODS: BACKEND -->
+        <mxCell id="e8" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#1565c0;" edge="1" parent="1" source="8" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#1565c0;" edge="1" parent="1" source="8" target="22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e10" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#1565c0;" edge="1" parent="1" source="8" target="32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BACKEND PODS TO DB SERVICE -->
+        <mxCell id="e11" value="connect" style="dashed=1;endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="12" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e12" style="dashed=1;endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="22" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e13" style="dashed=1;endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="32" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DB SERVICE TO PGPOOL POOL -->
+        <mxCell id="e14" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="9" target="14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e15" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="9" target="24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e16" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="9" target="34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PGPOOL TO POSTGRES (sample: Node 1 primary writes go through local PgPool) -->
+        <mxCell id="e17" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="14" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e18" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="24" target="23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e19" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="34" target="33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- DB REPLICATION: STREAMING REPLICATION -->
+        <mxCell id="e20" value="stream replication" style="dashed=1;endArrow=classic;html=1;strokeWidth=1.5;strokeColor=#880e4f;" edge="1" parent="1" source="13" target="23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e21" value="stream replication" style="dashed=1;endArrow=classic;html=1;strokeWidth=1.5;strokeColor=#880e4f;" edge="1" parent="1" source="23" target="33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- CONFIG/SECRETS INJECTION -->
+        <mxCell id="e22" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="40" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e23" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="40" target="22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e24" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="40" target="32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e25" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="41" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e26" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="41" target="22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e27" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#9673a6;" edge="1" parent="1" source="41" target="32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PVC CONNECTIONS -->
+        <mxCell id="e28" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#512da8;" edge="1" parent="1" source="pvc1" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e29" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#512da8;" edge="1" parent="1" source="pvc2" target="23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e30" style="dashed=1;endArrow=open;html=1;strokeWidth=1;strokeColor=#512da8;" edge="1" parent="1" source="pvc3" target="33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MIGRATION JOB TO DB -->
+        <mxCell id="e31" style="dashed=1;endArrow=classic;html=1;strokeWidth=1;strokeColor=#880e4f;" edge="1" parent="1" source="35" target="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

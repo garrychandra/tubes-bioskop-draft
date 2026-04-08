@@ -4,7 +4,7 @@ metadata:
   name: cinema-backend
   namespace: cinema
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: cinema-backend
