@@ -22,11 +22,30 @@ spec:
                   matchLabels:
                     app: cinema-backend
                 topologyKey: kubernetes.io/hostname
+      # Use the dedicated backend service account (defined in rbac.yaml).
+      # automountServiceAccountToken is false there so the API token is
+      # not projected into the container unnecessarily.
+      serviceAccountName: cinema-backend-sa
+      # Pod-level security: all containers in this pod run as UID/GID 1000.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault  # Apply the container runtime's default syscall filter
       containers:
         - name: backend
           image: your-registry/cinema-backend:latest  # replace with your image
           ports:
             - containerPort: 5000
+          # Container-level security hardening.
+          securityContext:
+            allowPrivilegeEscalation: false  # setuid/setgid binaries cannot escalate
+            readOnlyRootFilesystem: true      # attackers cannot write to the image FS
+            capabilities:
+              drop:
+                - ALL  # Drop every Linux capability; add back only if strictly needed
           envFrom:
             - configMapRef:
                 name: cinema-config
@@ -58,8 +77,19 @@ spec:
               memory: "128Mi"
               cpu: "100m"
             limits:
-              memory: "512Mi"
+              # Increased from 512Mi to 1Gi to reduce risk of OOM kills under
+              # sustained load or a slow-query DoS scenario.
+              memory: "1Gi"
               cpu: "500m"
+          # /tmp is needed by Node.js for temporary files; use an in-memory
+          # emptyDir so readOnlyRootFilesystem: true does not break the app.
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory  # Stored in RAM — not persisted to node disk
 ---
 apiVersion: v1
 kind: Service

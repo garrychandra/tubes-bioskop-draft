@@ -22,10 +22,25 @@ spec:
         app: cinema-migrate
     spec:
       restartPolicy: OnFailure
+      # Pod-level security context for the migration job.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: your-registry/cinema-backend:latest  # replace with your image
           command: ["sh", "-c", "npx sequelize-cli db:migrate && npx sequelize-cli db:seed:all"]
+          # Container-level hardening — same policy as the backend pod.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           envFrom:
             - configMapRef:
                 name: cinema-config
@@ -47,3 +62,10 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory

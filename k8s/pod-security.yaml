@@ -1,0 +1,103 @@
+# ============================================================
+# Pod Security — Security Contexts for Cinema App
+#
+# Why: By default, Kubernetes runs containers as root (UID 0)
+# with full Linux capabilities and the ability to escalate
+# privileges. If an attacker breaks out of the application
+# layer they immediately have root access inside the container,
+# making lateral movement and container escape much easier.
+#
+# These security contexts enforce:
+#   - Non-root execution (UID/GID 1000)
+#   - Read-only root filesystem (writes go to explicit emptyDir
+#     volumes so nothing unexpected is written to the image FS)
+#   - All Linux capabilities dropped (no CAP_NET_ADMIN, etc.)
+#   - Privilege escalation disabled (setuid/setgid binaries
+#     cannot raise their effective UID)
+#   - Seccomp RuntimeDefault profile limits syscall surface
+#
+# NOTE: These are PATCH manifests (strategic merge patch). They
+# are kept separate for clarity, but the same securityContext
+# blocks should be added directly to backend.yaml and
+# frontend.yaml (already done in those files).  This file
+# serves as the canonical reference and can be applied with
+# `kubectl patch` if you prefer to keep the original manifests
+# untouched.
+# ============================================================
+
+# Backend security context patch
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cinema-backend
+  namespace: cinema
+spec:
+  template:
+    spec:
+      # Pod-level security: applies to all containers in the pod
+      securityContext:
+        runAsNonRoot: true    # Refuse to start if image runs as root
+        runAsUser: 1000       # UID 1000 — non-privileged user
+        runAsGroup: 1000      # GID 1000
+        fsGroup: 1000         # Files created on volumes owned by GID 1000
+        seccompProfile:
+          type: RuntimeDefault  # Apply the container runtime's default seccomp filter
+      containers:
+        - name: backend
+          # Container-level security: overrides/supplements pod-level
+          securityContext:
+            allowPrivilegeEscalation: false  # Prevent setuid/setgid escalation
+            readOnlyRootFilesystem: true      # Attacker cannot write to image FS
+            capabilities:
+              drop:
+                - ALL  # Drop every Linux capability (NET_ADMIN, SYS_PTRACE, etc.)
+          # Backend needs to write temporary files; use an in-memory volume
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory  # Stored in RAM, not on disk — faster and more secure
+---
+# Frontend (Nginx) security context patch
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cinema-frontend
+  namespace: cinema
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # Nginx requires writable dirs for cache, pid, and client body temp.
+          # Mount these as emptyDirs instead of making the whole FS writable.
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp-dir
+          emptyDir:
+            medium: Memory

@@ -1,0 +1,113 @@
+# ============================================================
+# RBAC — Role-Based Access Control for Cinema App
+#
+# Why: By default all pods share the "default" service account
+# which often has broad permissions on the Kubernetes API.  If
+# a pod is compromised an attacker can use its service-account
+# token to query the API server, enumerate secrets across
+# namespaces, or create new workloads.
+#
+# Least-privilege principle: each component gets its OWN
+# service account with the MINIMUM permissions it actually
+# needs.  The backend and frontend currently need NO Kubernetes
+# API access at all — but we create the accounts anyway so we
+# can explicitly audit and tighten permissions later without
+# disrupting other components.
+# ============================================================
+
+# ── Service Accounts ─────────────────────────────────────────
+
+# Dedicated service account for the backend.
+# Having a named SA lets us add image-pull secrets, pod identity
+# annotations (e.g. Workload Identity) and audit logs per-component.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cinema-backend-sa
+  namespace: cinema
+  labels:
+    app: cinema-backend
+# Opt out of auto-mounting the API token — the backend does not
+# need to call the Kubernetes API, so there is no reason to
+# expose the token inside the container at all.
+automountServiceAccountToken: false
+---
+# Dedicated service account for the frontend.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cinema-frontend-sa
+  namespace: cinema
+  labels:
+    app: cinema-frontend
+automountServiceAccountToken: false
+---
+# ── Roles ────────────────────────────────────────────────────
+
+# Read-only role scoped to the cinema namespace.
+# Grants the minimum access needed to read ConfigMaps and
+# the component's own Secrets (e.g. to support future
+# tooling that reads config from the API, like spring-cloud
+# kubernetes or a config reloader sidecar).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cinema-backend-role
+  namespace: cinema
+rules:
+  # Allow reading ConfigMaps in the cinema namespace only.
+  # The backend may need to reload config without a restart.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  # Allow reading only the secrets this component owns.
+  # resourceNames restricts access to named secrets — prevents
+  # reading secrets belonging to other components.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["cinema-secrets"]
+    verbs: ["get"]
+---
+# Frontend role: read-only access to its own ConfigMap only.
+# The frontend (Nginx) has no need to read secrets from the API.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cinema-frontend-role
+  namespace: cinema
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+# ── RoleBindings ─────────────────────────────────────────────
+
+# Bind the backend service account to the backend role.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cinema-backend-rolebinding
+  namespace: cinema
+subjects:
+  - kind: ServiceAccount
+    name: cinema-backend-sa
+    namespace: cinema
+roleRef:
+  kind: Role
+  name: cinema-backend-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind the frontend service account to the frontend role.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cinema-frontend-rolebinding
+  namespace: cinema
+subjects:
+  - kind: ServiceAccount
+    name: cinema-frontend-sa
+    namespace: cinema
+roleRef:
+  kind: Role
+  name: cinema-frontend-role
+  apiGroup: rbac.authorization.k8s.io

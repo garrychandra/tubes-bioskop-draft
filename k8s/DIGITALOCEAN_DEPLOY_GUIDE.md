@@ -495,23 +495,117 @@ kubectl -n ingress-nginx logs deployment/ingress-nginx-controller
 
 ---
 
+## Step 12: Apply Security Hardening
+
+The following security manifests are included in `k8s/` and should be applied **in this order** after the base deployment is running.
+
+### Why each measure is needed
+
+| File | What it does | Why it matters |
+|------|-------------|----------------|
+| `rbac.yaml` | Creates per-component service accounts with least-privilege Kubernetes API access | Limits blast radius if a pod is compromised — attacker cannot use the pod's token to enumerate secrets across namespaces |
+| `network-policies.yaml` | Enforces zero-trust: deny-all by default, allow only required paths | Prevents a compromised frontend pod from directly querying the database, blocks lateral movement |
+| `pod-security.yaml` | Reference patch: non-root UID, read-only rootfs, drop all Linux capabilities, no privilege escalation | Reduces container escape risk; even if an attacker runs code inside the container they have minimal OS privileges |
+
+Security contexts are already embedded in `backend.yaml`, `frontend.yaml`, and `migration-job.yaml` — the `pod-security.yaml` file is a reference/patch document.
+
+### 12.1 Apply RBAC
+
+> ⚠️ **Apply RBAC before deploying pods.** `backend.yaml` and `frontend.yaml` reference the service accounts created here. If the service accounts don't exist yet, the pods will fail to start.
+
+```bash
+# Creates service accounts for backend and frontend with least-privilege roles.
+kubectl apply -f k8s/rbac.yaml
+
+# Verify service accounts were created
+kubectl -n cinema get serviceaccounts
+kubectl -n cinema describe role cinema-backend-role
+```
+
+### 12.2 Apply Network Policies
+
+```bash
+# Apply zero-trust network policies.
+# Requires a CNI plugin that supports NetworkPolicy (Cilium, Calico, Weave — all
+# supported on DigitalOcean Kubernetes by default via Cilium).
+kubectl apply -f k8s/network-policies.yaml
+
+# Verify policies were created
+kubectl -n cinema get networkpolicies
+```
+
+### 12.3 Validate Network Isolation
+
+After applying network policies, verify that the expected traffic flows work and unwanted flows are blocked:
+
+```bash
+# ✅ Should succeed: backend can reach the database (port 5432).
+# The pod uses app=cinema-backend label so the network policy allows it.
+kubectl -n cinema run test-allowed \
+  --image=busybox \
+  --rm -it --restart=Never \
+  --labels="app=cinema-backend" -- \
+  nc -zv cinema-postgresql-ha-pgpool 5432
+
+# ✅ Should succeed: DNS resolution still works for all pods
+kubectl -n cinema run test-dns --image=busybox --rm -it --restart=Never -- \
+  nslookup cinema-backend-service
+
+# ❌ Should FAIL: frontend cannot directly reach the database (blocked by network policy)
+kubectl -n cinema run test-blocked \
+  --image=busybox \
+  --rm -it --restart=Never \
+  --labels="app=cinema-frontend" -- \
+  nc -zv cinema-postgresql-ha-pgpool 5432
+# Expected output: nc: cinema-postgresql-ha-pgpool (x.x.x.x:5432): Connection timed out
+```
+
+### 12.4 Validate Pod Security Contexts
+
+```bash
+# Confirm containers are NOT running as root (should return 1000, not 0)
+kubectl -n cinema exec deploy/cinema-backend -- id
+# Expected: uid=1000 gid=1000 groups=1000
+
+# Confirm root filesystem is read-only
+kubectl -n cinema exec deploy/cinema-backend -- touch /test-write 2>&1
+# Expected: touch: /test-write: Read-only file system
+```
+
+### 12.5 Validate RBAC
+
+```bash
+# Confirm backend SA cannot list secrets (only cinema-secrets is allowed by name)
+kubectl -n cinema auth can-i list secrets --as=system:serviceaccount:cinema:cinema-backend-sa
+# Expected: no
+
+# Confirm backend SA can read its own secret
+kubectl -n cinema auth can-i get secret/cinema-secrets --as=system:serviceaccount:cinema:cinema-backend-sa
+# Expected: yes
+```
+
+---
+
 ## Summary: Full Deployment Order
 
 ```
-1. doctl auth init
-2. Create DOKS cluster (Step 1)
-3. Create container registry (Step 2)
-4. Build & push images (Step 3)
-5. Add domain to DO (Step 4)
-6. kubectl apply -f k8s/namespace.yaml
-7. Create secrets with kubectl create secret (Step 5)
-8. Install ingress-nginx (Step 6)
-9. Get LB IP → create DNS A records (Step 6.1)
+1.  doctl auth init
+2.  Create DOKS cluster (Step 1)
+3.  Create container registry (Step 2)
+4.  Build & push images (Step 3)
+5.  Add domain to DO (Step 4)
+6.  kubectl apply -f k8s/namespace.yaml
+7.  Create secrets with kubectl create secret (Step 5)
+8.  Install ingress-nginx (Step 6)
+9.  Get LB IP → create DNS A records (Step 6.1)
 10. Install cert-manager (Step 7)
 11. Update Ingress manifest with real domain (Step 8)
 12. helm install postgresql-ha (Step 9)
-13. kubectl apply all manifests (Step 10)
-14. Verify SSL (Step 11)
+13. kubectl apply -f k8s/rbac.yaml          ← security: create service accounts BEFORE deploying pods (Step 12.1)
+14. kubectl apply all manifests (Step 10)
+15. kubectl apply -f k8s/network-policies.yaml  ← security (Step 12.2)
+16. Validate security (Step 12.3 – 12.5)
+17. Verify SSL (Step 11)
 ```
 
 ---
