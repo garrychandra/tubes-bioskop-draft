@@ -1,10 +1,6 @@
 # ============================================================
 # Zero-Trust Network Policies for Cinema App
 #
-# Why: Without these, any pod can reach any other pod on the
-# cluster network. A compromised frontend could directly query
-# the database, bypassing all backend validation logic.
-#
 # Strategy: deny-all by default, then add explicit allow rules
 # for each required communication path only.
 # ============================================================
@@ -22,9 +18,9 @@ spec:
     - Ingress
     - Egress
 ---
-# 2. Allow DNS egress for every pod in the namespace so that
-#    in-cluster service discovery (e.g. cinema-backend-service)
-#    continues to work. Port 53 UDP/TCP is required by kube-dns.
+# 2. Allow DNS egress for every pod so in-cluster service
+#    discovery (e.g. cinema-postgres-service) works.
+#    Port 53 UDP/TCP is required by kube-dns.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -43,7 +39,6 @@ spec:
 ---
 # 3. Allow the Nginx Ingress Controller (running in the
 #    ingress-nginx namespace) to reach the frontend pods.
-#    Without this, external traffic would never reach the app.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -64,9 +59,46 @@ spec:
         - protocol: TCP
           port: 80
 ---
-# 4. Allow the frontend pods to call the backend API.
-#    Only frontend → backend on port 5000 is permitted;
-#    frontend → database is implicitly blocked by deny-all.
+# 4. Allow the Ingress controller to reach the backend API
+#    directly (for /api/* paths routed by the Ingress rule).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-backend
+  namespace: cinema
+spec:
+  podSelector:
+    matchLabels:
+      app: cinema-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 5000
+---
+# 5. Allow frontend pods to egress to the backend service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-egress-to-backend
+  namespace: cinema
+spec:
+  podSelector:
+    matchLabels:
+      app: cinema-frontend
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 5000
+---
+# 6. Allow backend pods to receive traffic from the frontend.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -87,10 +119,7 @@ spec:
         - protocol: TCP
           port: 5000
 ---
-# 5. Allow the backend pods to egress to the backend service
-#    (needed when backend pods call each other through the
-#    service, and for the migration job which runs the same
-#    image) as well as to the pgpool connection pooler on 5432.
+# 7. Allow backend pods to egress to PostgreSQL on port 5432.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -107,8 +136,7 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# 6. Allow the migration job to reach PostgreSQL (pgpool) so it
-#    can run db:migrate and db:seed before the backend starts.
+# 8. Allow the migration job to egress to PostgreSQL.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -125,10 +153,8 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# 7. Allow the PostgreSQL HA pods (pgpool + postgresql) to
-#    receive connections from backend/migration on port 5432.
-#    Pgpool itself is the entry point; it internally routes to
-#    primary or replica pods.
+# 9. Allow the PostgreSQL pod to receive connections from
+#    the backend and migration job on port 5432.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -137,7 +163,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: postgresql-ha
+      app: cinema-postgres
   policyTypes:
     - Ingress
   ingress:
@@ -152,45 +178,25 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# 8. Allow PostgreSQL HA internal replication traffic between
-#    pgpool and postgresql pods (Bitnami chart uses port 5432
-#    for replication as well as 5431 for pgpool healthcheck).
+# 10. Allow backend pods to send email via Gmail SMTP.
+#     nodemailer uses port 465 (SSL) or 587 (STARTTLS).
+#     Without this policy the default-deny rule silently drops
+#     all outbound SMTP traffic, breaking the forgot-password
+#     OTP email flow.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-postgresql-internal
+  name: allow-backend-egress-smtp
   namespace: cinema
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: postgresql-ha
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: postgresql-ha
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: postgresql-ha
----
-# 9. Allow frontend pods to egress to the backend service.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-frontend-egress-to-backend
-  namespace: cinema
-spec:
-  podSelector:
-    matchLabels:
-      app: cinema-frontend
+      app: cinema-backend
   policyTypes:
     - Egress
   egress:
     - ports:
         - protocol: TCP
-          port: 5000
+          port: 465   # Gmail SMTP over SSL
+        - protocol: TCP
+          port: 587   # Gmail SMTP over STARTTLS

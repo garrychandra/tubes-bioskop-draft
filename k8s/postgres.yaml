@@ -1,0 +1,125 @@
+# ============================================================
+# PostgreSQL — Simple StatefulSet with Persistent Volume
+#
+# Replaces the Bitnami postgresql-ha Helm chart.
+# Single-instance PostgreSQL is sufficient for a demo/
+# short-lived deployment and avoids the 6-pod overhead of
+# the HA setup (pgpool + primary + 2 replicas).
+#
+# Data is stored on a DigitalOcean Block Storage PVC (5Gi)
+# and survives pod restarts and rescheduling on the same node.
+# ============================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cinema-postgres
+  namespace: cinema
+spec:
+  serviceName: cinema-postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cinema-postgres
+  template:
+    metadata:
+      labels:
+        app: cinema-postgres
+    spec:
+      # fsGroup ensures the mounted PVC directory is owned by
+      # the postgres group so the process can read/write data.
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: cinema-config
+                  key: DB_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: cinema-config
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: DB_PASSWORD
+            # Use a subdirectory inside the mount to avoid the
+            # "lost+found" directory conflict that blocks initdb.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  # volumeClaimTemplates creates one PVC per StatefulSet pod.
+  # With replicas: 1 this gives exactly one 5Gi Block Storage volume.
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: do-block-storage  # DigitalOcean Block Storage (default on DOKS)
+        resources:
+          requests:
+            storage: 5Gi
+---
+# Headless service — required by the StatefulSet for stable
+# pod DNS names (cinema-postgres-0.cinema-postgres-headless).
+apiVersion: v1
+kind: Service
+metadata:
+  name: cinema-postgres-headless
+  namespace: cinema
+spec:
+  selector:
+    app: cinema-postgres
+  clusterIP: None
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# Regular ClusterIP service — the backend connects to this
+# stable DNS name instead of the pod IP directly.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cinema-postgres-service
+  namespace: cinema
+spec:
+  selector:
+    app: cinema-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

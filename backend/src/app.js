@@ -9,6 +9,8 @@ const routes = require('./routes');
 
 const app = express();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -16,13 +18,17 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
+// Global rate limiting (generous fallback; sensitive routes have their own stricter limiter)
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use(limiter);
 
+// HTTP request logging
+// In production use the 'combined' Apache format (standard for log aggregators)
+// rather than 'dev' which was designed for local development readability.
+app.use(morgan(isProduction ? 'combined' : 'dev'));
+
 // Parsing
 app.use(express.json());
-app.use(morgan('dev'));
 
 // Routes
 app.use('/api', routes);
@@ -33,10 +39,14 @@ app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().
 // 404 handler
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 
-// Error handler
-app.use((err, req, res, next) => {
+// ─── Global Error Handler ────────────────────────────────────────────────────
+// In production, never leak internal error details (stack traces, DB constraint
+// names, file paths) to the client.  Only expose them in non-production envs
+// where a developer is actively debugging.
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   console.error(err.stack);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+  const message = isProduction ? 'Internal Server Error' : (err.message || 'Internal Server Error');
+  res.status(err.status || 500).json({ error: message });
 });
 
 module.exports = app;

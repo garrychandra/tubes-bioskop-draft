@@ -4,7 +4,7 @@ metadata:
   name: cinema-backend
   namespace: cinema
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: cinema-backend
@@ -26,6 +26,9 @@ spec:
       # automountServiceAccountToken is false there so the API token is
       # not projected into the container unnecessarily.
       serviceAccountName: cinema-backend-sa
+      # Pull secret created by: doctl registry kubernetes-manifest | kubectl apply -f -
+      imagePullSecrets:
+        - name: registry-cinema-registry
       # Pod-level security: all containers in this pod run as UID/GID 1000.
       securityContext:
         runAsNonRoot: true
@@ -36,7 +39,7 @@ spec:
           type: RuntimeDefault  # Apply the container runtime's default syscall filter
       containers:
         - name: backend
-          image: your-registry/cinema-backend:latest  # replace with your image
+          image: registry.digitalocean.com/cinema-registry/cinema-backend:latest
           ports:
             - containerPort: 5000
           # Container-level security hardening.
@@ -60,6 +63,16 @@ spec:
                 secretKeyRef:
                   name: cinema-secrets
                   key: JWT_SECRET
+            - name: EMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: EMAIL_USER
+            - name: EMAIL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: EMAIL_PASS
           livenessProbe:
             httpGet:
               path: /health

@@ -3,10 +3,6 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { User } = require('../models');
 
-// ─── In-memory OTP store ────────────────────────────────────────────────────
-// Structure: { email => { otp, expiresAt } }
-const otpStore = new Map();
-
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
 // ─── Nodemailer transporter ──────────────────────────────────────────────────
@@ -107,6 +103,8 @@ const changePassword = async (req, res) => {
 };
 
 // ─── Forgot Password — Step 1: Send OTP via Gmail ────────────────────────────
+// OTP is persisted to the database (reset_otp + reset_otp_expires columns)
+// so the flow is stateless across multiple backend replicas.
 const forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
@@ -116,9 +114,12 @@ const forgotPassword = async (req, res) => {
     // Always return success to avoid email enumeration
     if (!user) return res.json({ message: 'If an account with that email exists, a code has been sent.' });
 
-    // Generate 6-digit OTP
+    // Generate 6-digit OTP and persist it to the user's DB row
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(email, { otp, expiresAt: Date.now() + OTP_EXPIRY_MS });
+    await user.update({
+      reset_otp: otp,
+      reset_otp_expires: new Date(Date.now() + OTP_EXPIRY_MS),
+    });
 
     const transporter = createTransporter();
     await transporter.sendMail({
@@ -150,25 +151,34 @@ const forgotPassword = async (req, res) => {
 };
 
 // ─── Forgot Password — Step 2: Verify OTP ────────────────────────────────────
+// Reads OTP from the database instead of an in-memory Map.
 const verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) return res.status(400).json({ error: 'email and otp are required' });
 
-  const record = otpStore.get(email);
-  if (!record) return res.status(400).json({ error: 'No OTP requested for this email.' });
-  if (Date.now() > record.expiresAt) {
-    otpStore.delete(email);
-    return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-  }
-  if (record.otp !== otp.toString()) {
-    return res.status(400).json({ error: 'Incorrect OTP code.' });
-  }
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user || !user.reset_otp) {
+      return res.status(400).json({ error: 'No OTP requested for this email.' });
+    }
+    if (new Date() > user.reset_otp_expires) {
+      // Clear the expired OTP
+      await user.update({ reset_otp: null, reset_otp_expires: null });
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+    }
+    if (user.reset_otp !== otp.toString()) {
+      return res.status(400).json({ error: 'Incorrect OTP code.' });
+    }
 
-  // OTP valid — clear it and issue a short-lived reset token
-  otpStore.delete(email);
-  const resetToken = jwt.sign({ email, purpose: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '10m' });
+    // OTP valid — clear it from DB and issue a short-lived reset token
+    await user.update({ reset_otp: null, reset_otp_expires: null });
+    const resetToken = jwt.sign({ email, purpose: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '10m' });
 
-  res.json({ message: 'OTP verified.', reset_token: resetToken });
+    res.json({ message: 'OTP verified.', reset_token: resetToken });
+  } catch (err) {
+    console.error('[Verify OTP]', err);
+    res.status(500).json({ error: 'OTP verification failed.' });
+  }
 };
 
 // ─── Forgot Password — Step 3: Reset Password with token ─────────────────────

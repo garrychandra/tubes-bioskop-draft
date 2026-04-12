@@ -8,3 +8,8 @@ dist
 build
 coverage
 **/*.log
+# Never bake credentials into Docker image layers
+.env
+.env.*
+backend/.env
+backend/.env.*

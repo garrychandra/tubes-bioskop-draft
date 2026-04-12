@@ -30,6 +30,18 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: false,
   },
+  // Used by the forgot-password OTP flow. Stored in the DB (not in-memory)
+  // so the flow works correctly across multiple backend replicas.
+  reset_otp: {
+    type: DataTypes.STRING(6),
+    allowNull: true,
+    defaultValue: null,
+  },
+  reset_otp_expires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'users',
   timestamps: false,
