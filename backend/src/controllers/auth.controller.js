@@ -114,10 +114,11 @@ const forgotPassword = async (req, res) => {
     // Always return success to avoid email enumeration
     if (!user) return res.json({ message: 'If an account with that email exists, a code has been sent.' });
 
-    // Generate 6-digit OTP and persist it to the user's DB row
+    // Generate 6-digit OTP and persist its hash to the user's DB row
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(otp, 12);
     await user.update({
-      reset_otp: otp,
+      reset_otp: hashedOtp,
       reset_otp_expires: new Date(Date.now() + OTP_EXPIRY_MS),
     });
 
@@ -166,7 +167,8 @@ const verifyOtp = async (req, res) => {
       await user.update({ reset_otp: null, reset_otp_expires: null });
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
-    if (user.reset_otp !== otp.toString()) {
+    const isMatch = await bcrypt.compare(otp.toString(), user.reset_otp);
+    if (!isMatch) {
       return res.status(400).json({ error: 'Incorrect OTP code.' });
     }
 
