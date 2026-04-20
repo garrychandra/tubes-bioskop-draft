@@ -36,8 +36,8 @@ export default function Navbar() {
         <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, gap: 1 }}>
           <Button color="inherit" component={RouterLink} to="/">Home</Button>
           <Button color="inherit" component={RouterLink} to="/movies">Movies</Button>
-          <Button color="inherit" component={RouterLink} to="/schedule">Schedule</Button>
-          <Button color="inherit" component={RouterLink} to="/cinema">Cinemas</Button>
+          {user?.role !== 'kasir_offline' && (<Button color="inherit" component={RouterLink} to="/schedule">Schedule</Button>)}
+          {user?.role !== 'kasir_offline' && (<Button component={RouterLink} to="/cinema" color="inherit">Cinema</Button>)}
           <Button color="inherit" component={RouterLink} to="/verify">Verify Ticket</Button>
         </Box>
 
