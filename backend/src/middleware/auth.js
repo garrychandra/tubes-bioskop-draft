@@ -28,5 +28,12 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, requireAdmin };
+const requireKasirOffline = (req, res, next) => {
+  if (req.user?.role !== 'kasir_offline' && req.user?.role !== 'Admin') {
+    return res.status(403).json({ error: 'Akses ditolak: Hanya Kasir Offline dan Admin yang diizinkan' });
+  }
+  next();
+};
+
+module.exports = { authenticate, requireAdmin, requireKasirOffline };
 

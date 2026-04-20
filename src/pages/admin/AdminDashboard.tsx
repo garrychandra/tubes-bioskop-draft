@@ -67,7 +67,7 @@ export default function AdminDashboard() {
   const [studioForm, setStudioForm] = useState({ id_bioskop: '', nama_studio: '', kapasitas: 80 })
 
   const fetchCinemas = () => {
-    api.get('/bioskop').then(res => setCinemas(res.data.bioskop || [])).catch(() => {})
+    api.get('/bioskop').then(res => setCinemas(res.data.bioskop || [])).catch(() => { })
   }
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
     fetchCinemas()
     api.get('/admin/noshows', { params: { days: 14 } })
       .then(res => setNoShowData(res.data.noshows || []))
-      .catch(() => {})
+      .catch(() => { })
     // Fetch halls for schedule creation
     api.get('/bioskop').then(async (res) => {
       const bioskop = res.data.bioskop || []
@@ -90,7 +90,7 @@ export default function AdminDashboard() {
       )
       const results = await Promise.all(hallRequests)
       setHalls(results.flat())
-    }).catch(() => {})
+    }).catch(() => { })
   }, [dispatch])
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function AdminDashboard() {
       setCinemaDialog(false)
       setCinemaForm({ nama_bioskop: '', lokasi: '', image_url: '' })
       fetchCinemas()
-    } catch (err) {}
+    } catch (err) { }
   }
 
   const handleCreateStudio = async () => {
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
       })
       setStudioDialog(false)
       setStudioForm({ id_bioskop: '', nama_studio: '', kapasitas: 80 })
-    } catch (err) {}
+    } catch (err) { }
   }
 
   const tabLabels = ['Overview', 'Movies', 'Schedules', 'Orders', 'Users', 'Cinemas']
@@ -201,7 +201,7 @@ export default function AdminDashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#888" tick={{ fontSize: 11 }} tickFormatter={(v) => `Rp${(v/1000).toFixed(0)}k`} />
+                <YAxis stroke="#888" tick={{ fontSize: 11 }} tickFormatter={(v) => `Rp${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: any) => [`Rp${Number(v).toLocaleString()}`, 'Revenue']} labelStyle={{ color: '#fff' }} contentStyle={{ background: '#141414', border: '1px solid #333' }} />
                 <Area type="monotone" dataKey="revenue" stroke="#e50914" fill="url(#revGrad)" strokeWidth={2} />
               </AreaChart>
@@ -216,7 +216,7 @@ export default function AdminDashboard() {
                 <XAxis dataKey="date" stroke="#888" tick={{ fontSize: 11 }} />
                 <YAxis stroke="#888" tick={{ fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#141414', border: '1px solid #333' }} labelStyle={{ color: '#fff' }} />
-                <Bar dataKey="transactions" fill="#f5c518" radius={[4,4,0,0]} />
+                <Bar dataKey="transactions" fill="#f5c518" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -237,7 +237,7 @@ export default function AdminDashboard() {
                   labelStyle={{ color: '#fff' }}
                   formatter={(v: any) => [v, 'No-Shows']}
                 />
-                <Bar dataKey="noshows" fill="#f57c00" radius={[4,4,0,0]} />
+                <Bar dataKey="noshows" fill="#f57c00" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -437,18 +437,27 @@ export default function AdminDashboard() {
                   <TableCell>Rp{Number(u.total_spent).toLocaleString()}</TableCell>
                   <TableCell>-</TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       <Button
                         size="small" variant="outlined"
                         onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Admin' ? 'User' : 'Admin' }))}
-                        disabled={u.role === 'Banned'}
+                        disabled={u.role === 'Banned' || u.role === 'kasir_offline'}
                       >
                         {u.role === 'Admin' ? 'Demote' : 'Make Admin'}
                       </Button>
+
+                      <Button
+                        size="small" variant="outlined" color="warning"
+                        onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'kasir_offline' ? 'User' : 'kasir_offline' }))}
+                        disabled={u.role === 'Banned' || u.role === 'Admin'}
+                      >
+                        {u.role === 'kasir_offline' ? 'Demote Kasir' : 'Make Kasir'}
+                      </Button>
+                      
                       <Button
                         size="small" variant="contained" color={u.role === 'Banned' ? 'success' : 'error'}
                         onClick={() => dispatch(updateUserRole({ id: u.id_user, role: u.role === 'Banned' ? 'User' : 'Banned' }))}
-                        disabled={u.role === 'Admin'}
+                        disabled={u.role === 'Admin' || u.role === 'kasir_offline'}
                       >
                         {u.role === 'Banned' ? 'Unban' : 'Ban'}
                       </Button>
@@ -464,7 +473,7 @@ export default function AdminDashboard() {
       {/* CINEMAS */}
       {tab === 5 && (
         <Box>
-           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2 }}>
             <Button variant="contained" color="secondary" onClick={() => setStudioDialog(true)}>+ Add Studio</Button>
             <Button variant="contained" onClick={() => setCinemaDialog(true)}>+ Add Cinema</Button>
           </Box>
@@ -498,11 +507,11 @@ export default function AdminDashboard() {
             <DialogTitle>Add New Cinema</DialogTitle>
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important', minWidth: 400 }}>
               <TextField label="Cinema Name" required fullWidth
-                value={cinemaForm.nama_bioskop} onChange={e => setCinemaForm({...cinemaForm, nama_bioskop: e.target.value})} />
+                value={cinemaForm.nama_bioskop} onChange={e => setCinemaForm({ ...cinemaForm, nama_bioskop: e.target.value })} />
               <TextField label="Location" required fullWidth multiline rows={2}
-                value={cinemaForm.lokasi} onChange={e => setCinemaForm({...cinemaForm, lokasi: e.target.value})} />
+                value={cinemaForm.lokasi} onChange={e => setCinemaForm({ ...cinemaForm, lokasi: e.target.value })} />
               <TextField label="Image URL" fullWidth
-                value={cinemaForm.image_url} onChange={e => setCinemaForm({...cinemaForm, image_url: e.target.value})} />
+                value={cinemaForm.image_url} onChange={e => setCinemaForm({ ...cinemaForm, image_url: e.target.value })} />
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setCinemaDialog(false)}>Cancel</Button>
@@ -516,14 +525,14 @@ export default function AdminDashboard() {
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important', minWidth: 400 }}>
               <FormControl fullWidth required>
                 <InputLabel>Target Cinema</InputLabel>
-                <Select value={studioForm.id_bioskop} label="Target Cinema" onChange={e => setStudioForm({...studioForm, id_bioskop: e.target.value})}>
+                <Select value={studioForm.id_bioskop} label="Target Cinema" onChange={e => setStudioForm({ ...studioForm, id_bioskop: e.target.value })}>
                   {cinemas.map((c: any) => <MenuItem key={c.id_bioskop} value={c.id_bioskop}>{c.nama_bioskop}</MenuItem>)}
                 </Select>
               </FormControl>
               <TextField label="Studio Name (e.g. Studio 1)" required fullWidth
-                value={studioForm.nama_studio} onChange={e => setStudioForm({...studioForm, nama_studio: e.target.value})} />
+                value={studioForm.nama_studio} onChange={e => setStudioForm({ ...studioForm, nama_studio: e.target.value })} />
               <TextField label="Capacity (Seats)" type="number" required fullWidth
-                value={studioForm.kapasitas} onChange={e => setStudioForm({...studioForm, kapasitas: Number(e.target.value)})} />
+                value={studioForm.kapasitas} onChange={e => setStudioForm({ ...studioForm, kapasitas: Number(e.target.value) })} />
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setStudioDialog(false)}>Cancel</Button>

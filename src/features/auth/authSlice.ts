@@ -5,7 +5,7 @@ export interface User {
   id_user: string
   nama: string
   email: string
-  role: 'User' | 'Admin'
+  role: 'User' | 'Admin' | 'kasir_offline'
   pending_discount?: boolean
 }
 

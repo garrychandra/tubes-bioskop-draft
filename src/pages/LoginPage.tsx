@@ -170,6 +170,7 @@ export default function LoginPage() {
           <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 700 }}>Demo credentials</Typography>
           <Typography variant="caption" color="text.secondary" display="block">User: john@example.com / user123</Typography>
           <Typography variant="caption" color="text.secondary" display="block">Admin: admin@cinema.com / admin123</Typography>
+          <Typography variant="caption" color="text.secondary" display="block">Admin_offline: Qwerty@cinema.com / admin123</Typography>
         </Box>
       </Paper>
 
