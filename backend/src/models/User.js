@@ -42,6 +42,11 @@ const User = sequelize.define('User', {
     allowNull: true,
     defaultValue: null,
   },
+  membership_expires_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
 }, {
   tableName: 'users',
   timestamps: false,

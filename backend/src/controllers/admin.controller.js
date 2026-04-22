@@ -4,8 +4,9 @@ const { Op } = require('sequelize');
 
 const getStats = async (req, res) => {
   try {
-    const [totalUsers, totalFilms, revenueResult, todayResult, tiketRows, noShowToday] = await Promise.all([
+    const [totalUsers, totalSubscribers, totalFilms, revenueResult, todayResult, tiketRows, noShowToday] = await Promise.all([
       User.count({ where: { role: 'User' } }),
+      User.count({ where: { membership_expires_at: { [Op.gt]: new Date() } } }),
       Film.count(),
       Transaksi.sum('total_bayar', { where: { status: 'paid' } }),
       sequelize.query(`
@@ -29,6 +30,7 @@ const getStats = async (req, res) => {
 
     res.json({
       total_users: totalUsers,
+      total_subscribers: totalSubscribers,
       total_films: totalFilms,
       total_revenue: parseFloat(revenueResult || 0),
       today_revenue: parseFloat(todayResult[0]?.today_revenue || 0),
@@ -89,7 +91,7 @@ const getTransactions = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const users = await sequelize.query(`
-      SELECT u.id_user, u.nama, u.email, u.role,
+      SELECT u.id_user, u.nama, u.email, u.role, u.membership_expires_at,
              COUNT(tr.id_transaksi) as total_transactions,
              COALESCE(SUM(tr.total_bayar), 0) as total_spent
       FROM users u

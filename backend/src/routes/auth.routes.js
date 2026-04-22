@@ -20,6 +20,7 @@ router.post('/register', authLimiter, ctrl.register);
 router.post('/login', authLimiter, ctrl.login);
 router.get('/me', require('../middleware/auth').authenticate, ctrl.getMe);
 router.put('/change-password', require('../middleware/auth').authenticate, ctrl.changePassword);
+router.post('/membership', require('../middleware/auth').authenticate, ctrl.subscribeMembership);
 
 // Forgot password — 3-step OTP flow (also rate-limited)
 router.post('/forgot-password', authLimiter, ctrl.forgotPassword);

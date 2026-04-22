@@ -65,14 +65,22 @@ const buy = async (req, res) => {
     // Check if user has a pending no-show discount
     const user = await User.findByPk(id_user, { transaction: t })
     const hasDiscount = user && user.pending_discount
+    const isMember = user && user.membership_expires_at && new Date(user.membership_expires_at) > new Date()
 
     let total = hargaTiket * kursi_ids.length
     let discountAmount = 0
+    let membershipDiscountAmount = 0
 
     if (hasDiscount) {
       // 50% off exactly 1 ticket
       discountAmount = Math.round(hargaTiket * NO_SHOW_DISCOUNT_PERCENT)
       total = total - discountAmount
+    }
+
+    if (isMember) {
+      // 10% off the ticket subtotal after no-show discount
+      membershipDiscountAmount = Math.round(total * 0.1)
+      total -= membershipDiscountAmount
     }
 
     // Calculate FnB total
@@ -177,6 +185,8 @@ const buy = async (req, res) => {
       qr_code: qrDataUrl,
       discount_applied: hasDiscount,
       discount_amount: discountAmount,
+      membership_discount_applied: isMember,
+      membership_discount_amount: membershipDiscountAmount,
     })
   } catch (err) {
     await t.rollback()

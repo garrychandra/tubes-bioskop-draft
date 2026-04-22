@@ -38,7 +38,9 @@ export default function Navbar() {
           <Button color="inherit" component={RouterLink} to="/movies">Movies</Button>
           {user?.role !== 'kasir_offline' && (<Button color="inherit" component={RouterLink} to="/schedule">Schedule</Button>)}
           {user?.role !== 'kasir_offline' && (<Button component={RouterLink} to="/cinema" color="inherit">Cinema</Button>)}
-          <Button color="inherit" component={RouterLink} to="/verify">Verify Ticket</Button>
+          {user?.role !== 'User' && (
+            <Button color="inherit" component={RouterLink} to="/verify">Verify Ticket</Button>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

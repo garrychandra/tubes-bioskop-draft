@@ -7,6 +7,7 @@ export interface User {
   email: string
   role: 'User' | 'Admin' | 'kasir_offline'
   pending_discount?: boolean
+  membership_expires_at?: string
 }
 
 interface AuthState {
@@ -76,6 +77,12 @@ const authSlice = createSlice({
     clearFraudWarning(state) {
       state.noShowNotification = null
     },
+    updateUser(state, action: PayloadAction<Partial<User>>) {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload }
+        localStorage.setItem('cinema_user', JSON.stringify(state.user))
+      }
+    },
   },
   extraReducers: (builder) => {
     const defaultSuccess = (state: AuthState, action: PayloadAction<{ user: User; token: string }>) => {
@@ -101,5 +108,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError, clearNoShowNotification, clearFraudWarning } = authSlice.actions
+export const { logout, clearError, clearNoShowNotification, clearFraudWarning, updateUser } = authSlice.actions
 export default authSlice.reducer

@@ -26,6 +26,7 @@ module.exports = {
 
       const adminHash = await bcrypt.hash('admin123', 12);
       const userHash = await bcrypt.hash('user123', 12);
+      const kasirHash = await bcrypt.hash('admin123', 12);
 
       await queryInterface.bulkInsert(
         'users',
@@ -36,6 +37,7 @@ module.exports = {
             email: 'admin@cinema.com',
             password: adminHash,
             role: 'Admin',
+            pending_discount: false,
           },
           {
             id_user: userId,
@@ -43,7 +45,16 @@ module.exports = {
             email: 'john@example.com',
             password: userHash,
             role: 'User',
+            pending_discount: true,
           },
+          {
+            id_user: uuidv4(),
+            nama: 'kasir',
+            email: 'qwerty@cinema.com',
+            password: kasirHash,
+            role: 'kasir_offline',
+            pending_discount: false,
+          }
         ],
         { transaction }
       );

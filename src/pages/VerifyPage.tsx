@@ -8,19 +8,28 @@ import CancelIcon from '@mui/icons-material/Cancel'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
 import { verifyTicket, clearVerify, markTicketUsed } from '../features/tickets/ticketsSlice'
 import { QRCodeSVG } from 'qrcode.react'
+import QrScanner from '../components/QrScanner'
 
 export default function VerifyPage() {
   const dispatch = useAppDispatch()
   const { verifyResult, loading, error } = useAppSelector((s) => s.tickets)
   const [barcode, setBarcode] = useState('')
+  const [showScanner, setShowScanner] = useState(false)
 
   const handleVerify = () => {
     if (barcode.trim()) dispatch(verifyTicket(barcode.trim()))
   }
 
+  const handleScanSuccess = (decodedText: string) => {
+    setBarcode(decodedText)
+    setShowScanner(false)
+    dispatch(verifyTicket(decodedText))
+  }
+
   const handleReset = () => {
     dispatch(clearVerify())
     setBarcode('')
+    setShowScanner(true)
   }
 
   const handleRedeem = async () => {
@@ -41,17 +50,39 @@ export default function VerifyPage() {
 
       <Paper sx={{ p: 4 }}>
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-          <TextField
-            fullWidth label="Ticket Barcode" value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            placeholder="CINEMA-XXXXXXXX-..."
-            onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-          />
-          <Button variant="contained" onClick={handleVerify} disabled={loading || !barcode.trim()}>
-            {loading ? <CircularProgress size={22} /> : 'Verify'}
-          </Button>
-        </Box>
+        
+        {!verifyResult && (
+          <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {showScanner ? (
+              <Box sx={{ width: '100%', mb: 2 }}>
+                <QrScanner onScanSuccess={handleScanSuccess} />
+                <Button fullWidth variant="text" onClick={() => setShowScanner(false)} sx={{ mt: 1 }}>
+                  Close Scanner
+                </Button>
+              </Box>
+            ) : (
+              <Button variant="outlined" onClick={() => setShowScanner(true)} sx={{ mb: 3 }}>
+                Use Webcam to Scan Barcode
+              </Button>
+            )}
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+              Or enter the barcode manually:
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+              <TextField
+                fullWidth label="Ticket Barcode" value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="CINEMA-XXXXXXXX-..."
+                onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+              />
+              <Button variant="contained" onClick={handleVerify} disabled={loading || !barcode.trim()}>
+                {loading ? <CircularProgress size={22} /> : 'Verify'}
+              </Button>
+            </Box>
+          </Box>
+        )}
 
         {verifyResult && (
           <Box>
