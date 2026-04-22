@@ -18,6 +18,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { items: movies, loading } = useAppSelector((s) => s.movies)
   const { items: schedules } = useAppSelector((s) => s.schedules)
+  const { user } = useAppSelector((s) => s.auth)
 
   useEffect(() => {
     dispatch(fetchMovies({ status: 'now_showing' }))
@@ -58,10 +59,12 @@ export default function HomePage() {
                 sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}>
                 Browse Movies
               </Button>
-              <Button variant="outlined" size="large" onClick={() => navigate('/schedule')}
-                sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}>
-                View Schedules
-              </Button>
+              {user?.role !== 'kasir_offline' && (
+                <Button variant="outlined" size="large" onClick={() => navigate('/schedule')}
+                  sx={{ px: 4, py: 1.5, fontSize: '1.1rem' }}>
+                  View Schedules
+                </Button>
+              )} 
             </Box>
           </Box>
         </Container>

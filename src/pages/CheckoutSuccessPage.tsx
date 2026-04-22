@@ -3,7 +3,6 @@ import { Container, Typography, Box, Button, Paper, Divider, Chip } from '@mui/m
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
-import { clearLastPurchase } from '../features/tickets/ticketsSlice'
 import { QRCodeSVG } from 'qrcode.react'
 
 export default function CheckoutSuccessPage() {
@@ -12,13 +11,13 @@ export default function CheckoutSuccessPage() {
   const { lastPurchase } = useAppSelector((s) => s.tickets)
 
   useEffect(() => {
-    return () => { dispatch(clearLastPurchase()) }
+    return () => { }
   }, [dispatch])
 
   if (!lastPurchase) {
     return (
       <Container maxWidth="sm" sx={{ py: 10, textAlign: 'center' }}>
-        <Typography>No purchase data. <Button onClick={() => navigate('/')}>Go Home</Button></Typography>
+        <Typography>No purchase data. <Button variant="outlined" onClick={() => navigate('/tickets')}>View My Tickets</Button></Typography>
       </Container>
     )
   }
@@ -78,8 +77,8 @@ export default function CheckoutSuccessPage() {
           <Button fullWidth variant="outlined" onClick={() => navigate('/tickets')}>
             View My Tickets
           </Button>
-          <Button fullWidth variant="contained" onClick={() => navigate('/')}>
-            Back to Home
+          <Button fullWidth variant="contained" onClick={() => navigate('/tickets')}>
+            View Tickets
           </Button>
         </Box>
       </Paper>

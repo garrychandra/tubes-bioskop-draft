@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const { User } = require('../models');
+const { User, Transaksi } = require('../models');
+const sequelize = require('../db/sequelize');
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -28,7 +29,7 @@ const register = async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     const user = await User.create({ nama, email, password: hash, role: 'User' });
     const token = jwt.sign({ id: user.id_user }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
-    res.status(201).json({ user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role }, token });
+    res.status(201).json({ user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role, pending_discount: user.pending_discount, membership_expires_at: user.membership_expires_at }, token });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Registration failed' });
@@ -49,7 +50,7 @@ const login = async (req, res) => {
     const token = jwt.sign({ id: user.id_user }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
     const response = {
-      user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role },
+      user: { id_user: user.id_user, nama: user.nama, email: user.email, role: user.role, pending_discount: user.pending_discount, membership_expires_at: user.membership_expires_at },
       token,
     };
 
@@ -75,6 +76,7 @@ const getMe = async (req, res) => {
       email: user.email,
       role: user.role,
       pending_discount: user.pending_discount,
+      membership_expires_at: user.membership_expires_at,
     }
   });
 };
@@ -99,6 +101,43 @@ const changePassword = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
+// ─── Subscribe to Membership (authenticated) ─────────────────────────────────
+const subscribeMembership = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const user = await User.findByPk(req.user.id_user, { transaction: t });
+    if (!user) {
+      await t.rollback();
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Set membership expiration to 30 days from now
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    
+    await user.update({ membership_expires_at: expiresAt }, { transaction: t });
+
+    // Dummy payment for membership
+    await Transaksi.create({
+      total_bayar: 50000,
+      status: 'paid',
+      id_user: user.id_user,
+      discount_applied: false
+    }, { transaction: t });
+
+    await t.commit();
+
+    res.json({ 
+      message: 'Membership activated successfully!',
+      membership_expires_at: expiresAt 
+    });
+  } catch (err) {
+    if (t) await t.rollback();
+    console.error(err);
+    res.status(500).json({ error: 'Failed to subscribe to membership' });
   }
 };
 
@@ -212,4 +251,4 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, changePassword, forgotPassword, verifyOtp, resetPassword };
+module.exports = { register, login, getMe, changePassword, subscribeMembership, forgotPassword, verifyOtp, resetPassword };

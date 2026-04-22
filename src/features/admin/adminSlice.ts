@@ -3,6 +3,7 @@ import api from '../../services/api'
 
 interface AdminStats {
   total_users: number
+  total_subscribers: number
   total_films: number
   total_revenue: number
   today_revenue: number

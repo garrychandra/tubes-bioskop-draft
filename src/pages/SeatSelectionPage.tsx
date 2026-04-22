@@ -36,7 +36,24 @@ export default function SeatSelectionPage() {
     return Number(schedule.harga_tiket)
   }
 
-  const totalPrice = selectedSeats.reduce((sum, sid) => sum + getPriceForSeat(sid), 0)
+  const rawTotalPrice = selectedSeats.reduce((sum, sid) => sum + getPriceForSeat(sid), 0)
+  
+  let noShowDiscountAmount = 0
+  let currentTotal = rawTotalPrice
+
+  if (user?.pending_discount && schedule && selectedSeats.length > 0) {
+    noShowDiscountAmount = Math.round(Number(schedule.harga_tiket) * 0.5)
+    currentTotal -= noShowDiscountAmount
+  }
+
+  let membershipDiscountAmount = 0
+  const isMember = user?.membership_expires_at && new Date(user.membership_expires_at) > new Date()
+  if (isMember && selectedSeats.length > 0) {
+    membershipDiscountAmount = Math.round(currentTotal * 0.1)
+    currentTotal -= membershipDiscountAmount
+  }
+
+  const finalTotalPrice = currentTotal
 
   const handleProceed = async () => {
     if (!id || selectedSeats.length === 0) return
@@ -118,7 +135,7 @@ export default function SeatSelectionPage() {
               <Divider sx={{ my: 2 }} />
 
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                {['online', 'bank_transfer', 'cash'].map((method) => (
+                {['online', 'bank_transfer'].map((method) => (
                   <Chip
                     key={method}
                     label={method.replace('_', ' ').toUpperCase()}
@@ -128,12 +145,40 @@ export default function SeatSelectionPage() {
                     clickable
                   />
                 ))}
+                {user?.role === 'kasir_offline' && (
+                  <Chip
+                    key="cash"
+                    label="Pay at Counter"
+                    variant={payMethod === 'cash' ? 'filled' : 'outlined'}
+                    color={payMethod === 'cash' ? 'primary' : 'default'}
+                    onClick={() => setPayMethod('cash')}
+                    clickable
+                  />
+                )}
               </Box>
+
+              {noShowDiscountAmount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                  <Typography variant="body2" color="success.main">No-Show Discount (-50% on 1 ticket)</Typography>
+                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 700 }}>
+                    -Rp{noShowDiscountAmount.toLocaleString()}
+                  </Typography>
+                </Box>
+              )}
+
+              {membershipDiscountAmount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                  <Typography variant="body2" color="success.main">Membership Discount (-10% off total)</Typography>
+                  <Typography variant="body2" color="success.main" sx={{ fontWeight: 700 }}>
+                    -Rp{membershipDiscountAmount.toLocaleString()}
+                  </Typography>
+                </Box>
+              )}
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                 <Typography variant="h6">Total</Typography>
                 <Typography variant="h6" color="primary.main" sx={{ fontWeight: 800 }}>
-                  Rp{totalPrice.toLocaleString()}
+                  Rp{finalTotalPrice.toLocaleString()}
                 </Typography>
               </Box>
 
@@ -141,7 +186,7 @@ export default function SeatSelectionPage() {
                 fullWidth variant="contained" size="large" sx={{ mt: 3 }}
                 onClick={handleBuy} disabled={buyLoading}
               >
-                {buyLoading ? <CircularProgress size={24} /> : `Confirm Payment — Rp${totalPrice.toLocaleString()}`}
+                {buyLoading ? <CircularProgress size={24} /> : `Confirm Payment — Rp${finalTotalPrice.toLocaleString()}`}
               </Button>
             </Paper>
           )}
@@ -164,8 +209,28 @@ export default function SeatSelectionPage() {
             <Typography variant="body2" color="text.secondary">
               Selected: <strong>{selectedSeats.length} seat(s)</strong>
             </Typography>
+            
+            <Box sx={{ mt: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2">Subtotal</Typography>
+                <Typography variant="body2">Rp{rawTotalPrice.toLocaleString()}</Typography>
+              </Box>
+              {noShowDiscountAmount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="success.main">No-show Discount</Typography>
+                  <Typography variant="body2" color="success.main">-Rp{noShowDiscountAmount.toLocaleString()}</Typography>
+                </Box>
+              )}
+              {membershipDiscountAmount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="success.main">Member (10%)</Typography>
+                  <Typography variant="body2" color="success.main">-Rp{membershipDiscountAmount.toLocaleString()}</Typography>
+                </Box>
+              )}
+            </Box>
+
             <Typography variant="h5" color="primary.main" sx={{ fontWeight: 800, mt: 1 }}>
-              Rp{totalPrice.toLocaleString()}
+              Rp{finalTotalPrice.toLocaleString()}
             </Typography>
 
             {step === 'select' && (

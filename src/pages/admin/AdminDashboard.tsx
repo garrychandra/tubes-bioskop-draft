@@ -19,6 +19,7 @@ import { fetchMovies, createMovie, deleteMovie } from '../../features/movies/mov
 import { fetchSchedules, createSchedule, deleteSchedule } from '../../features/schedules/schedulesSlice'
 import api from '../../services/api'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import StarIcon from '@mui/icons-material/Star'
 
 interface StatCardProps {
   title: string
@@ -157,6 +158,11 @@ export default function AdminDashboard() {
               <StatCard title="Total Users" icon={<PeopleIcon sx={{ color: 'white' }} />}
                 value={stats?.total_users || 0} color="#1976d2"
                 sub={`${stats?.today_orders || 0} orders today`}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <StatCard title="Total Subscribers" icon={<StarIcon sx={{ color: 'white' }} />}
+                value={stats?.total_subscribers || 0} color="#ffb400"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -420,6 +426,7 @@ export default function AdminDashboard() {
                 <TableCell>Orders</TableCell>
                 <TableCell>Total Spent</TableCell>
                 <TableCell>Joined</TableCell>
+                <TableCell>Member Until</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -436,6 +443,7 @@ export default function AdminDashboard() {
                   <TableCell>{u.total_transactions}</TableCell>
                   <TableCell>Rp{Number(u.total_spent).toLocaleString()}</TableCell>
                   <TableCell>-</TableCell>
+                  <TableCell>{u.membership_expires_at ? new Date(u.membership_expires_at).toLocaleDateString() : '-'}</TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       <Button
