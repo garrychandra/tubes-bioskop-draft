@@ -18,7 +18,12 @@ const getById = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  const { nama_bioskop, lokasi, image_url } = req.body;
+  const { nama_bioskop, lokasi } = req.body;
+  let image_url = req.body.image_url;
+  if (req.file && req.file.location) {
+    image_url = req.file.location;
+  }
+
   if (!nama_bioskop || !lokasi) return res.status(400).json({ error: 'nama_bioskop and lokasi required' });
   try {
     const bioskop = await Bioskop.create({ nama_bioskop, lokasi, image_url });
@@ -27,7 +32,12 @@ const create = async (req, res) => {
 };
 
 const update = async (req, res) => {
-  const { nama_bioskop, lokasi, image_url } = req.body;
+  const { nama_bioskop, lokasi } = req.body;
+  let image_url = req.body.image_url;
+  if (req.file && req.file.location) {
+    image_url = req.file.location;
+  }
+
   try {
     const bioskop = await Bioskop.findByPk(req.params.id);
     if (!bioskop) return res.status(404).json({ error: 'Not found' });

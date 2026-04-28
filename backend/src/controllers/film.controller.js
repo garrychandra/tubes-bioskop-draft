@@ -22,7 +22,12 @@ const getById = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  const { judul, deskripsi, poster_url, durasi, genre, status, release_date } = req.body;
+  const { judul, deskripsi, durasi, genre, status, release_date } = req.body;
+  let poster_url = req.body.poster_url; // fallback if they pass text
+  if (req.file && req.file.location) {
+    poster_url = req.file.location; // The S3 URL from DigitalOcean Spaces
+  }
+
   if (!judul) return res.status(400).json({ error: 'Judul is required' });
   try {
     const film = await Film.create({
@@ -37,7 +42,12 @@ const create = async (req, res) => {
 };
 
 const update = async (req, res) => {
-  const { judul, deskripsi, poster_url, durasi, genre, status, release_date } = req.body;
+  const { judul, deskripsi, durasi, genre, status, release_date } = req.body;
+  let poster_url = req.body.poster_url;
+  if (req.file && req.file.location) {
+    poster_url = req.file.location;
+  }
+
   try {
     const film = await Film.findByPk(req.params.id);
     if (!film) return res.status(404).json({ error: 'Film not found' });

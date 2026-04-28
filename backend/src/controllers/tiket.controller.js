@@ -210,7 +210,7 @@ const getMyTransactions = async (req, res) => {
           'nama_item', fn.nama_item, 'qty', df.qty, 'harga_saat_pesan', df.harga_saat_pesan
         )) FILTER (WHERE df.id_detail IS NOT NULL) as fnb_items
       FROM transaksi tr
-      LEFT JOIN tiket t ON t.id_transaksi = tr.id_transaksi
+      JOIN tiket t ON t.id_transaksi = tr.id_transaksi
       LEFT JOIN jadwal j ON t.id_jadwal = j.id_jadwal
       LEFT JOIN film f ON j.id_film = f.id_film
       LEFT JOIN studio s ON j.id_studio = s.id_studio
