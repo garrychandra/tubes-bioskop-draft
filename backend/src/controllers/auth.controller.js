@@ -1,20 +1,13 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const { User, Transaksi } = require('../models');
 const sequelize = require('../db/sequelize');
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
-// ─── Nodemailer transporter ──────────────────────────────────────────────────
-const createTransporter = () =>
-  nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+// ─── Nodemailer transporter removed (using Resend instead) ──────────────
 
 // ─── Register ────────────────────────────────────────────────────────────────
 const register = async (req, res) => {
@@ -161,9 +154,13 @@ const forgotPassword = async (req, res) => {
       reset_otp_expires: new Date(Date.now() + OTP_EXPIRY_MS),
     });
 
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: `"CineMax Cinema" <${process.env.EMAIL_USER}>`,
+    console.log(`\n======================================================`);
+    console.log(`🎬 [DEMO MODE] Password Reset OTP for ${email}: ${otp}`);
+    console.log(`======================================================\n`);
+
+    // Send via Resend HTTP API
+    resend.emails.send({
+      from: 'CineMax Cinema <noreply@garryserver.tech>', // Make sure garryserver.tech is verified in Resend
       to: email,
       subject: 'Your CineMax Password Reset Code',
       html: `
@@ -181,6 +178,8 @@ const forgotPassword = async (req, res) => {
           </div>
         </div>
       `,
+    }).catch(err => {
+      console.error('[Forgot Password] Resend failed:', err);
     });
 
     res.json({ message: 'If an account with that email exists, a code has been sent.' });
