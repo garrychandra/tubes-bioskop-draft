@@ -26,6 +26,11 @@ module.exports = {
           allowNull: false,
           defaultValue: 'paid',
         },
+        discount_applied: {
+          type: Sequelize.BOOLEAN,
+          allowNull: false,
+          defaultValue: false,
+        },
         id_user: {
           type: Sequelize.UUID,
           allowNull: false,

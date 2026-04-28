@@ -29,6 +29,26 @@ module.exports = {
           allowNull: false,
           defaultValue: "User",
         },
+        pending_discount: {
+          type: Sequelize.BOOLEAN,
+          allowNull: false,
+          defaultValue: false,
+        },
+        membership_expires_at: {
+          type: Sequelize.DATE,
+          allowNull: true,
+          defaultValue: null,
+        },
+        reset_otp: {
+          type: Sequelize.STRING(255),
+          allowNull: true,
+          defaultValue: null,
+        },
+        reset_otp_expires: {
+          type: Sequelize.DATE,
+          allowNull: true,
+          defaultValue: null,
+        },
       },
       { transaction }
     );
