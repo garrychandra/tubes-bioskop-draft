@@ -32,3 +32,8 @@ backend/.env
 .yalc/
 yalc.lock
 BACKEND_STUDY_GUIDE.md
+DIGITALOCEAN_DEPLOY_GUIDE copy.md
+configmap-secret.yaml
+database.md
+database.pdf
+architecture.mmd

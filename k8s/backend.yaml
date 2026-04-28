@@ -36,7 +36,7 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         seccompProfile:
-          type: RuntimeDefault  # Apply the container runtime's default syscall filter
+          type: RuntimeDefault # Apply the container runtime's default syscall filter
       containers:
         - name: backend
           image: registry.digitalocean.com/cinema-registry/cinema-backend:latest
@@ -44,11 +44,11 @@ spec:
             - containerPort: 5000
           # Container-level security hardening.
           securityContext:
-            allowPrivilegeEscalation: false  # setuid/setgid binaries cannot escalate
-            readOnlyRootFilesystem: true      # attackers cannot write to the image FS
+            allowPrivilegeEscalation: false # setuid/setgid binaries cannot escalate
+            readOnlyRootFilesystem: true # attackers cannot write to the image FS
             capabilities:
               drop:
-                - ALL  # Drop every Linux capability; add back only if strictly needed
+                - ALL # Drop every Linux capability; add back only if strictly needed
           envFrom:
             - configMapRef:
                 name: cinema-config
@@ -73,6 +73,21 @@ spec:
                 secretKeyRef:
                   name: cinema-secrets
                   key: EMAIL_PASS
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: RESEND_API_KEY
+            - name: DO_SPACES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: DO_SPACES_KEY
+            - name: DO_SPACES_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cinema-secrets
+                  key: DO_SPACES_SECRET
           livenessProbe:
             httpGet:
               path: /health
@@ -102,7 +117,7 @@ spec:
       volumes:
         - name: tmp-dir
           emptyDir:
-            medium: Memory  # Stored in RAM — not persisted to node disk
+            medium: Memory # Stored in RAM — not persisted to node disk
 ---
 apiVersion: v1
 kind: Service

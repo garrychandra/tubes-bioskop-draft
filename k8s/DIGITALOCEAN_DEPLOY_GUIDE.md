@@ -7,7 +7,7 @@
 
 ## Architecture Overview
 
-```
+```text
 Node 1                         Node 2
 ┌───────────────────────┐    ┌───────────────────────┐
 │  cinema-frontend-0    │    │  cinema-frontend-1    │
@@ -90,7 +90,7 @@ kubectl get nodes   # should show 2 Ready nodes
 ### 2.1 Create the registry
 
 ```bash
-doctl registry create cinema-registry --subscription-tier starter
+doctl registry create cinema-registry --subscription-tier basic
 ```
 
 ### 2.2 Authenticate Docker with DOCR
@@ -117,7 +117,7 @@ doctl registry kubernetes-manifest | kubectl apply -f -
 ### 3.1 Backend
 
 ```bash
-cd c:\Users\vongg\Documents\sbd\tubes-bioskop\backend
+cd backend
 
 docker build -t registry.digitalocean.com/cinema-registry/cinema-backend:latest .
 docker push registry.digitalocean.com/cinema-registry/cinema-backend:latest
@@ -128,11 +128,9 @@ docker push registry.digitalocean.com/cinema-registry/cinema-backend:latest
 The frontend image bakes `VITE_API_URL` at build time. Pass your real domain (or LB IP) so the React app calls the right backend URL:
 
 ```bash
-cd c:\Users\vongg\Documents\sbd\tubes-bioskop
-
 # Replace the --build-arg value with your actual domain or LB IP
 docker build \
-  --build-arg VITE_API_URL=https://garryserver.tech/api \
+  --build-arg VITE_API_URL=https://<YOUR_DOMAIN_OR_IP>/api \
   -t registry.digitalocean.com/cinema-registry/cinema-frontend:latest .
 
 docker push registry.digitalocean.com/cinema-registry/cinema-frontend:latest
@@ -150,7 +148,7 @@ docker push registry.digitalocean.com/cinema-registry/cinema-frontend:latest
 ### 4.1 Add your domain to DigitalOcean
 
 ```bash
-doctl compute domain create garryserver.tech
+doctl compute domain create your-domain.com
 ```
 
 Or: **DigitalOcean Dashboard → Networking → Domains → Add Domain**
@@ -169,37 +167,50 @@ ns3.digitalocean.com
 
 ---
 
-## Step 5: Create Real Secrets ⚠️
+## Step 5: Gather API Keys and Create Secrets ⚠️
 
-**Never use the placeholder values in `configmap-secret.yaml`.**  
-Create the real secret directly with `kubectl`:
+**Never use placeholder values.** You need to create a Kubernetes Secret to store your database password, JWT secret, Resend email API key, and DigitalOcean Spaces keys.
 
-```bash
+### 5.1 Get your Resend API Key (for emails)
+
+1. Go to [resend.com](https://resend.com) and log in.
+2. Go to **API Keys** and generate a new key.
+3. Make sure you have verified your domain (`your-domain.com`) in the **Domains** tab so you can send emails.
+
+### 5.2 Get your DigitalOcean Spaces Keys (for image uploads)
+
+DigitalOcean Spaces is an S3-compatible storage service used to save uploaded movie posters.
+
+1. In your DigitalOcean Dashboard, click **Spaces Object Storage** on the left menu.
+2. Click the **Settings** tab near the top.
+3. Scroll down to **Spaces Access Keys** and click **Generate New Key**.
+4. Save the **Access Key** (starts with `DO...`) and the **Secret Key** (long hidden string).
+
+### 5.3 Create the Kubernetes Secret
+
+Run this command in PowerShell to create the secret. Replace the `YOUR_...` placeholders with your actual keys.
+
+```powershell
 # Create the namespace first
 kubectl apply -f k8s/namespace.yaml
 
-# PowerShell — generate strong random secrets
+# Generate strong random passwords for the Database and JWT
 $DB_PASS  = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 32 | ForEach-Object { [char]$_ })
 $JWT_SEC  = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 64 | ForEach-Object { [char]$_ })
 
-# Or in Git Bash / WSL:
-# DB_PASS=$(openssl rand -base64 32)
-# JWT_SEC=$(openssl rand -base64 64)
-
-kubectl create secret generic cinema-secrets \
-  --namespace cinema \
-  --from-literal=DB_PASSWORD="$DB_PASS" \
-  --from-literal=JWT_SECRET="$JWT_SEC" \
-  --from-literal=EMAIL_USER="your-gmail@gmail.com" \
-  --from-literal=EMAIL_PASS="your-gmail-app-password"
+# Create the secret
+kubectl create secret generic cinema-secrets `
+  --namespace cinema `
+  --from-literal=DB_PASSWORD="$DB_PASS" `
+  --from-literal=JWT_SECRET="$JWT_SEC" `
+  --from-literal=RESEND_API_KEY="YOUR_RESEND_API_KEY" `
+  --from-literal=DO_SPACES_KEY="YOUR_DO_ACCESS_KEY" `
+  --from-literal=DO_SPACES_SECRET="YOUR_DO_SECRET_KEY"
 ```
 
-> ⚠️ The `DB_PASSWORD` value here becomes the PostgreSQL `POSTGRES_PASSWORD`.  
-> Both are read from the same `cinema-secrets` Secret, so they are automatically in sync.
+> ⚠️ **Note**: The backticks (\`) above are used for multi-line commands in PowerShell. If using Bash/Mac/Linux, use backslashes (`\`) instead.
 >
-> 📧 `EMAIL_USER` and `EMAIL_PASS` are required for the forgot-password OTP email flow.  
-> Use a **Gmail App Password** (not your real Gmail password).  
-> Generate one at: **Google Account → Security → 2-Step Verification → App Passwords**
+> The `DB_PASSWORD` value here automatically becomes the PostgreSQL `POSTGRES_PASSWORD`, so your backend and database will always be in sync.
 
 ---
 
@@ -228,10 +239,10 @@ Copy the `EXTERNAL-IP` — you'll need it to create DNS records and to test via 
 ### 6.1 (If using a domain) Create DNS A records
 
 ```bash
-doctl compute domain records create garryserver.tech \
-  --record-type A --record-name @ --record-data <LB_IP> --record-ttl 300
+doctl compute domain records create your-domain.com \
+  --record-type A --record-name '@' --record-data <LB_IP> --record-ttl 300
 
-doctl compute domain records create garryserver.tech \
+doctl compute domain records create your-domain.com \
   --record-type A --record-name www --record-data <LB_IP> --record-ttl 300
 ```
 
@@ -261,7 +272,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com   # ← replace
+    email: your-email@example.com # ← replace
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
@@ -284,10 +295,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - garryserver.tech
+        - your-domain.com
       secretName: cinema-tls
   rules:
-    - host: garryserver.tech
+    - host: your-domain.com
       ...
 ```
 
@@ -299,8 +310,7 @@ Edit `k8s/frontend.yaml` — update the Ingress host:
 
 ```yaml
 # If using a domain:
-- host: garryserver.tech
-
+- host: your-domain.com
 # If using raw LB IP (quick demo), remove the host: line entirely
 # and keep only the http: block — nginx will match all hostnames.
 ```
@@ -308,7 +318,7 @@ Edit `k8s/frontend.yaml` — update the Ingress host:
 Also update the ConfigMap in `configmap-secret.yaml`:
 
 ```yaml
-FRONTEND_URL: https://garryserver.tech   # or http://<LB_IP>
+FRONTEND_URL: https://your-domain.com # or http://<LB_IP>
 ```
 
 ---
@@ -337,8 +347,6 @@ kubectl apply -f k8s/postgres.yaml
 kubectl -n cinema rollout status statefulset/cinema-postgres
 
 # 6. Run database migrations (one-shot Job)
-#    This now includes the OTP columns migration (014-user-otp) in addition
-#    to basic schema and seed data. Wait for it to fully complete.
 kubectl apply -f k8s/migration-job.yaml
 kubectl -n cinema wait --for=condition=complete job/cinema-migrate --timeout=180s
 
@@ -352,7 +360,6 @@ kubectl apply -f k8s/backend.yaml
 kubectl apply -f k8s/frontend.yaml
 
 # 9. Apply network policies (zero-trust isolation)
-#    Includes SMTP egress on ports 465/587 for OTP password-reset emails.
 kubectl apply -f k8s/network-policies.yaml
 
 # 10. Apply pod security contexts
@@ -383,7 +390,7 @@ kubectl -n cinema get pvc
 # Hit the login endpoint 6 times quickly — the 6th should return HTTP 429
 for i in 1 2 3 4 5 6; do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST https://garryserver.tech/api/auth/login \
+    -X POST https://your-domain.com/api/auth/login \
     -H "Content-Type: application/json" \
     -d '{"email":"test@test.com","password":"wrong"}'
 done
@@ -455,30 +462,40 @@ kubectl -n cinema run test-blocked \
 # Should time out — that's correct behaviour
 ```
 
+### Restart deployment
+
+```bash
+# Restart Frontend
+kubectl rollout restart deployment cinema-frontend -n cinema
+
+# Restart Backend
+kubectl rollout restart deployment cinema-backend -n cinema
+```
+
 ---
 
 ## Security Checklist
 
-| Item | Status |
-|------|--------|
-| Secrets created with `kubectl create secret` (not in Git) | ✅ Do this in Step 5 |
-| `EMAIL_USER` / `EMAIL_PASS` stored in K8s Secret, not ConfigMap | ✅ Step 5 |
-| `.env` files excluded from Docker image layers (`.dockerignore`) | ✅ Root `.dockerignore` |
-| OTP stored in PostgreSQL, not in-memory (works across 2 replicas) | ✅ `014-user-otp` migration |
-| Auth endpoints rate-limited (5 req / 15 min per IP) | ✅ `auth.routes.js` |
-| Production error handler — no internal details leaked to clients | ✅ `app.js` |
-| Ticket redemption restricted to Admin role only | ✅ `tiket.routes.js` |
-| SMTP egress allowed on ports 465 + 587 for OTP emails | ✅ `network-policies.yaml` |
-| Pod anti-affinity: frontend/backend spread across nodes | ✅ In manifests |
-| Network policies: deny-all + explicit allow-list | ✅ `network-policies.yaml` |
-| Non-root containers + read-only rootfs (frontend/backend) | ✅ In manifests |
-| Capabilities dropped (frontend/backend) | ✅ In manifests |
-| `automountServiceAccountToken: false` | ✅ `rbac.yaml` |
-| PVC for database persistence | ✅ `postgres.yaml` |
-| DOCR private registry (not public Docker Hub) | ✅ Step 2 |
-| All SQL queries use parameterized bind (`$1`, `$2`...) — no injection | ✅ All controllers |
-| CORS locked to `FRONTEND_URL` env var | ✅ `app.js` |
-| Helmet security headers (CSP, HSTS, X-Frame-Options) | ✅ `app.js` |
+| Item                                                                  | Status                      |
+| --------------------------------------------------------------------- | --------------------------- |
+| Secrets created with `kubectl create secret` (not in Git)             | ✅ Do this in Step 5        |
+| API keys stored in K8s Secret, not ConfigMap                          | ✅ Step 5                   |
+| `.env` files excluded from Docker image layers (`.dockerignore`)      | ✅ Root `.dockerignore`     |
+| OTP stored in PostgreSQL, not in-memory (works across 2 replicas)     | ✅ `014-user-otp` migration |
+| Auth endpoints rate-limited (5 req / 15 min per IP)                   | ✅ `auth.routes.js`         |
+| Production error handler — no internal details leaked to clients      | ✅ `app.js`                 |
+| Ticket redemption restricted to Admin role only                       | ✅ `tiket.routes.js`        |
+| HTTP/HTTPS egress allowed for APIs (Resend, DO Spaces)                | ✅ `network-policies.yaml`  |
+| Pod anti-affinity: frontend/backend spread across nodes               | ✅ In manifests             |
+| Network policies: deny-all + explicit allow-list                      | ✅ `network-policies.yaml`  |
+| Non-root containers + read-only rootfs (frontend/backend)             | ✅ In manifests             |
+| Capabilities dropped (frontend/backend)                               | ✅ In manifests             |
+| `automountServiceAccountToken: false`                                 | ✅ `rbac.yaml`              |
+| PVC for database persistence                                          | ✅ `postgres.yaml`          |
+| DOCR private registry (not public Docker Hub)                         | ✅ Step 2                   |
+| All SQL queries use parameterized bind (`$1`, `$2`...) — no injection | ✅ All controllers          |
+| CORS locked to `FRONTEND_URL` env var                                 | ✅ `app.js`                 |
+| Helmet security headers (CSP, HSTS, X-Frame-Options)                  | ✅ `app.js`                 |
 
 ---
 
@@ -486,13 +503,57 @@ kubectl -n cinema run test-blocked \
 
 DigitalOcean bills hourly. Running for 24 hours:
 
-| Resource                 | Monthly price | 24-hour cost |
-|--------------------------|---------------|--------------|
-| 2× Nodes (s-2vcpu-4gb)  | ~$48          | ~$1.60       |
-| Load Balancer            | ~$12          | ~$0.40       |
-| Block Storage PVC (5Gi)  | ~$0.50        | ~$0.02       |
-| Container Registry       | Free (starter)| $0           |
-| **Total**                | **~$61/mo**   | **~$2.00**   |
+| Resource                | Monthly price  | 24-hour cost |
+| ----------------------- | -------------- | ------------ |
+| 2× Nodes (s-2vcpu-4gb)  | ~$48           | ~$1.60       |
+| Load Balancer           | ~$12           | ~$0.40       |
+| Block Storage PVC (5Gi) | ~$0.50         | ~$0.02       |
+| Container Registry      | Free (starter) | $0           |
+| **Total**               | **~$61/mo**    | **~$2.00**   |
 
 > 💡 **Clean up after the demo** to stop billing:  
-> `doctl kubernetes cluster delete cinema-cluster`
+> See Step 10 below for the full teardown process to avoid lingering charges.
+
+---
+
+## Step 10: Complete Teardown & Cleanup (CRITICAL)
+
+If you simply delete the cluster, DigitalOcean might sometimes leave orphaned Load Balancers or Block Storage volumes, which will continue to accrue charges. Follow these steps to cleanly destroy everything.
+
+### 10.1 Delete cloud-provisioned resources inside K8s
+
+Wait for these commands to finish. It tells DO to detach and delete the Block Storage and Load Balancer.
+
+```bash
+# Delete the Load Balancer
+kubectl delete svc -n ingress-nginx ingress-nginx-controller
+
+# Delete the PostgreSQL Block Storage (Volume)
+kubectl delete pvc -n cinema --all
+```
+
+### 10.2 Delete the Kubernetes Cluster
+
+```bash
+doctl kubernetes cluster delete cinema-cluster --force
+```
+
+### 10.3 Delete the Container Registry
+
+```bash
+doctl registry delete cinema-registry --force
+```
+
+### 10.4 Verify no orphaned resources remain (Important!)
+
+Check if any Load Balancers or Volumes were left behind. If these lists are empty, you are completely safe from future charges.
+
+```bash
+# Should return nothing
+doctl compute load-balancer list
+
+# Should return nothing
+doctl compute volume list
+```
+
+_(Optional) If you bought a domain or set DNS records through DigitalOcean, you can remove them via the dashboard or using `doctl compute domain delete your-domain.com --force`._

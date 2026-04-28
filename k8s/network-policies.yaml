@@ -57,7 +57,7 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
-          port: 80
+          port: 8080
 ---
 # 4. Allow the Ingress controller to reach the backend API
 #    directly (for /api/* paths routed by the Ingress rule).
