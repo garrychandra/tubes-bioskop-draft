@@ -3,6 +3,7 @@ import {
   Box, Avatar, Menu, MenuItem, Divider, Chip,
 } from '@mui/material'
 import MovieIcon from '@mui/icons-material/Movie'
+import MenuIcon from '@mui/icons-material/Menu'
 import { useState } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../app/hooks'
@@ -13,6 +14,7 @@ export default function Navbar() {
   const navigate = useNavigate()
   const { user } = useAppSelector((s) => s.auth)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [mobileMenuEl, setMobileMenuEl] = useState<null | HTMLElement>(null)
 
   const handleLogout = () => {
     dispatch(logout())
@@ -25,14 +27,45 @@ export default function Navbar() {
   return (
     <AppBar position="sticky" sx={{ background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(10px)' }}>
       <Toolbar>
-        <MovieIcon sx={{ color: 'primary.main', mr: 1, fontSize: 30 }} />
+        {/* Mobile Hamburger Menu */}
+        <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
+          <IconButton
+            size="large"
+            color="inherit"
+            onClick={(e) => setMobileMenuEl(e.currentTarget)}
+            sx={{ mr: 1, ml: -1 }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Menu
+            anchorEl={mobileMenuEl}
+            open={Boolean(mobileMenuEl)}
+            onClose={() => setMobileMenuEl(null)}
+            sx={{ display: { xs: 'block', md: 'none' } }}
+          >
+            <MenuItem onClick={() => { navigate('/'); setMobileMenuEl(null) }}>Home</MenuItem>
+            <MenuItem onClick={() => { navigate('/movies'); setMobileMenuEl(null) }}>Movies</MenuItem>
+            {user?.role !== 'kasir_offline' && (
+              <MenuItem onClick={() => { navigate('/schedule'); setMobileMenuEl(null) }}>Schedule</MenuItem>
+            )}
+            {user?.role !== 'kasir_offline' && (
+              <MenuItem onClick={() => { navigate('/cinema'); setMobileMenuEl(null) }}>Cinema</MenuItem>
+            )}
+            {user?.role !== 'User' && (
+              <MenuItem onClick={() => { navigate('/verify'); setMobileMenuEl(null) }}>Verify Ticket</MenuItem>
+            )}
+          </Menu>
+        </Box>
+
+        <MovieIcon sx={{ color: 'primary.main', mr: 1, fontSize: 30, display: { xs: 'none', sm: 'flex' } }} />
         <Typography
           variant="h6" component={RouterLink} to="/"
-          sx={{ fontWeight: 900, color: 'white', textDecoration: 'none', letterSpacing: 1, flexGrow: 0, mr: 4 }}
+          sx={{ fontWeight: 900, color: 'white', textDecoration: 'none', letterSpacing: 1, flexGrow: { xs: 1, md: 0 }, mr: 4 }}
         >
           CINEMAX
         </Typography>
 
+        {/* Desktop Menu */}
         <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, gap: 1 }}>
           <Button color="inherit" component={RouterLink} to="/">Home</Button>
           <Button color="inherit" component={RouterLink} to="/movies">Movies</Button>

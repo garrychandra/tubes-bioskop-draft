@@ -43,9 +43,13 @@ export const fetchMovieById = createAsyncThunk(
   },
 )
 
-export const createMovie = createAsyncThunk('movies/create', async (data: Partial<Movie>, { rejectWithValue }) => {
+export const createMovie = createAsyncThunk('movies/create', async (data: any, { rejectWithValue }) => {
   try {
-    const res = await api.post('/film', data)
+    const res = await api.post('/film', data, {
+      headers: {
+        'Content-Type': data instanceof FormData ? 'multipart/form-data' : 'application/json'
+      }
+    })
     return res.data.film as Movie
   }
   catch (err: any) { return rejectWithValue(err.response?.data?.error || 'Failed') }

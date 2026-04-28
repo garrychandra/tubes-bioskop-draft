@@ -164,14 +164,6 @@ export default function LoginPage() {
             Forgot Password?
           </Button>
         </Box>
-
-        {/* Demo credentials */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 700 }}>Demo credentials</Typography>
-          <Typography variant="caption" color="text.secondary" display="block">User: john@example.com / user123</Typography>
-          <Typography variant="caption" color="text.secondary" display="block">Admin: admin@cinema.com / admin123</Typography>
-          <Typography variant="caption" color="text.secondary" display="block">Admin_offline: qwerty@cinema.com / admin123</Typography>
-        </Box>
       </Paper>
 
       {/* ── No-Show Notification Dialog ─────────────────────────────────── */}

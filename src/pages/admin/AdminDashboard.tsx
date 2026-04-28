@@ -55,7 +55,7 @@ export default function AdminDashboard() {
 
   // Movie form state
   const [movieDialog, setMovieDialog] = useState(false)
-  const [movieForm, setMovieForm] = useState<{ judul: string; genre: string; durasi: number; poster_url: string; deskripsi: string; status: 'now_showing' | 'coming_soon' | 'ended' }>({ judul: '', genre: '', durasi: 120, poster_url: '', deskripsi: '', status: 'now_showing' })
+  const [movieForm, setMovieForm] = useState<{ judul: string; genre: string; durasi: number; poster_url: string; deskripsi: string; status: 'now_showing' | 'coming_soon' | 'ended'; poster_file?: File }>({ judul: '', genre: '', durasi: 120, poster_url: '', deskripsi: '', status: 'now_showing' })
 
   // Schedule form state
   const [schedDialog, setSchedDialog] = useState(false)
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
 
   // Cinema & Studio forms
   const [cinemaDialog, setCinemaDialog] = useState(false)
-  const [cinemaForm, setCinemaForm] = useState({ nama_bioskop: '', lokasi: '', image_url: '' })
+  const [cinemaForm, setCinemaForm] = useState<{ nama_bioskop: string; lokasi: string; image_url: string; image_file?: File }>({ nama_bioskop: '', lokasi: '', image_url: '' })
   const [studioDialog, setStudioDialog] = useState(false)
   const [studioForm, setStudioForm] = useState({ id_bioskop: '', nama_studio: '', kapasitas: 80 })
 
@@ -99,7 +99,18 @@ export default function AdminDashboard() {
   }, [dispatch, period])
 
   const handleCreateMovie = async () => {
-    const result = await dispatch(createMovie(movieForm as any))
+    const formData = new FormData()
+    formData.append('judul', movieForm.judul)
+    formData.append('genre', movieForm.genre)
+    formData.append('durasi', String(movieForm.durasi))
+    if (movieForm.poster_url) formData.append('poster_url', movieForm.poster_url)
+    if (movieForm.deskripsi) formData.append('deskripsi', movieForm.deskripsi)
+    formData.append('status', movieForm.status)
+    if (movieForm.poster_file) {
+      formData.append('poster', movieForm.poster_file)
+    }
+
+    const result = await dispatch(createMovie(formData as any))
     if (createMovie.fulfilled.match(result)) { setMovieDialog(false); setMovieForm({ judul: '', genre: '', durasi: 120, poster_url: '', deskripsi: '', status: 'now_showing' }) }
   }
 
@@ -110,7 +121,17 @@ export default function AdminDashboard() {
 
   const handleCreateCinema = async () => {
     try {
-      await api.post('/bioskop', cinemaForm)
+      const formData = new FormData()
+      formData.append('nama_bioskop', cinemaForm.nama_bioskop)
+      formData.append('lokasi', cinemaForm.lokasi)
+      if (cinemaForm.image_url) formData.append('image_url', cinemaForm.image_url)
+      if (cinemaForm.image_file) {
+        formData.append('image', cinemaForm.image_file)
+      }
+
+      await api.post('/bioskop', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
       setCinemaDialog(false)
       setCinemaForm({ nama_bioskop: '', lokasi: '', image_url: '' })
       fetchCinemas()
@@ -300,7 +321,22 @@ export default function AdminDashboard() {
               <TextField label="Title" value={movieForm.judul} onChange={(e) => setMovieForm({ ...movieForm, judul: e.target.value })} required fullWidth />
               <TextField label="Genre" value={movieForm.genre} onChange={(e) => setMovieForm({ ...movieForm, genre: e.target.value })} fullWidth />
               <TextField label="Duration (min)" type="number" value={movieForm.durasi} onChange={(e) => setMovieForm({ ...movieForm, durasi: Number(e.target.value) })} fullWidth />
-              <TextField label="Poster URL" value={movieForm.poster_url} onChange={(e) => setMovieForm({ ...movieForm, poster_url: e.target.value })} fullWidth />
+              
+              <Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Movie Poster (Upload Image)</Typography>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setMovieForm({ ...movieForm, poster_file: file });
+                    }
+                  }} 
+                />
+                {movieForm.poster_file && <Typography variant="caption" display="block" sx={{ mt: 1 }}>Selected: {movieForm.poster_file.name}</Typography>}
+              </Box>
+
               <TextField label="Description" value={movieForm.deskripsi} onChange={(e) => setMovieForm({ ...movieForm, deskripsi: e.target.value })} fullWidth multiline rows={3} />
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
@@ -518,8 +554,21 @@ export default function AdminDashboard() {
                 value={cinemaForm.nama_bioskop} onChange={e => setCinemaForm({ ...cinemaForm, nama_bioskop: e.target.value })} />
               <TextField label="Location" required fullWidth multiline rows={2}
                 value={cinemaForm.lokasi} onChange={e => setCinemaForm({ ...cinemaForm, lokasi: e.target.value })} />
-              <TextField label="Image URL" fullWidth
-                value={cinemaForm.image_url} onChange={e => setCinemaForm({ ...cinemaForm, image_url: e.target.value })} />
+              
+              <Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Cinema Image (Upload)</Typography>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setCinemaForm({ ...cinemaForm, image_file: file });
+                    }
+                  }} 
+                />
+                {cinemaForm.image_file && <Typography variant="caption" display="block" sx={{ mt: 1 }}>Selected: {cinemaForm.image_file.name}</Typography>}
+              </Box>
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setCinemaDialog(false)}>Cancel</Button>

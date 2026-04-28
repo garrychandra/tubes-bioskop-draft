@@ -6,6 +6,7 @@ import schedulesReducer from "../features/schedules/schedulesSlice"
 import seatsReducer from "../features/seats/seatsSlice"
 import ticketsReducer from "../features/tickets/ticketsSlice"
 import adminReducer from "../features/admin/adminSlice"
+import ratingsReducer from "../features/ratings/ratingsSlice"
 
 const rootReducer = {
   auth: authReducer,
@@ -14,6 +15,7 @@ const rootReducer = {
   seats: seatsReducer,
   tickets: ticketsReducer,
   admin: adminReducer,
+  ratings: ratingsReducer,
 }
 
 export const store = configureStore({ reducer: rootReducer })
