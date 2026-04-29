@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
   Container, Typography, Grid, Card, CardMedia,
   CardContent, CardActions, Button, Box, CircularProgress,
 } from '@mui/material'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import api from '../services/api'
-import { useState } from 'react'
 
 interface Bioskop {
   id_bioskop: string
@@ -56,7 +56,15 @@ export default function CinemaPage() {
                   </Box>
                 </CardContent>
                 <CardActions sx={{ p: 2, pt: 0 }}>
-                  <Button variant="outlined" fullWidth size="small" href={`/schedule?id_bioskop=${cinema.id_bioskop}`}>View Schedules</Button>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    size="small"
+                    component={Link}
+                    to={`/schedule?id_bioskop=${cinema.id_bioskop}`}
+                  >
+                    View Schedules
+                  </Button>
                 </CardActions>
               </Card>
             </Grid>
